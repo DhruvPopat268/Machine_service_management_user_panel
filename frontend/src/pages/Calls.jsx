@@ -48,6 +48,16 @@ export default function Calls() {
     <Layout title="My Calls">
       <main className="max-w-3xl mx-auto px-4 py-6">
 
+        {/* Raise Call Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => navigate('/raise-call')}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors cursor-pointer"
+          >
+            + Raise Call
+          </button>
+        </div>
+
         {/* Tab Toggle */}
         <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
           {TABS.map((tab) => (

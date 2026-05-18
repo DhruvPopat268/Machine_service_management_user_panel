@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { label: 'Home', path: '/' },
   { label: 'Owned Machines', path: '/machines' },
   { label: 'Calls', path: '/calls' },
+  { label: 'Raise a Call', path: '/raise-call' },
 ]
 
 export default function Sidebar({ open, onClose }) {

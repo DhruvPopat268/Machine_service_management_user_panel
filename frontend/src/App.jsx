@@ -9,6 +9,7 @@ import CallDetail from './pages/CallDetail'
 import UpdateProfile from './pages/UpdateProfile'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import RaiseCall from './pages/RaiseCall'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/profile" element={<UpdateProfile />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/raise-call" element={<RaiseCall />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
