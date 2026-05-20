@@ -53,3 +53,6 @@ export const sendChangeEmailOtp = (newEmail) =>
 
 export const verifyOtpChangeEmail = (otp) =>
   axiosInstance.post(`${BASE}/verify-otp-change-email`, { otp }).then(unwrap)
+
+export const changePassword = (body) =>
+  axiosInstance.post(`${BASE}/change-password`, body).then(unwrap)
