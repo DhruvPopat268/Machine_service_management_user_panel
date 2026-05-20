@@ -1,22 +1,31 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { sendResetOtp } from '../api/auth'
 
 export default function ForgotPassword() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!/\S+@\S+\.\S+/.test(email)) {
       setError('Please enter a valid email address')
       return
     }
     setError('')
-    setSent(true)
-    // simulate — after showing success, navigate to reset page after 1.5s
-    setTimeout(() => navigate('/reset-password', { state: { email } }), 1500)
+    setLoading(true)
+    try {
+      await sendResetOtp(email)
+      setSent(true)
+      setTimeout(() => navigate('/reset-password', { state: { email } }), 1500)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -63,9 +72,10 @@ export default function ForgotPassword() {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm cursor-pointer"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm cursor-pointer"
             >
-              Send Reset OTP
+              {loading ? 'Sending...' : 'Send Reset OTP'}
             </button>
           </form>
         )}

@@ -1,29 +1,194 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
-import { currentCustomer } from '../data/machines'
+import { fetchZones, updateProfile, sendChangeEmailOtp, verifyOtpChangeEmail } from '../api/auth'
+import { useProfile } from '../context/ProfileContext'
+import { getAvatarInitials } from '../utils/getAvatarInitials'
 
-const ZONES = [
-  'North Zone', 'South Zone', 'East Zone', 'West Zone', 'Central Zone',
-  'North-East Zone', 'North-West Zone', 'South-East Zone', 'South-West Zone',
-]
+function ChangeEmailModal({ currentEmail, onClose, onSuccess }) {
+  const [step, setStep] = useState('email') // 'email' | 'otp'
+  const [newEmail, setNewEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [otpError, setOtpError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const inputRefs = useRef([])
+
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault()
+    if (!/\S+@\S+\.\S+/.test(newEmail)) { setEmailError('Enter a valid email address'); return }
+    if (newEmail === currentEmail) { setEmailError('New email must be different from current email'); return }
+    setEmailError('')
+    setLoading(true)
+    try {
+      await sendChangeEmailOtp(newEmail)
+      setStep('otp')
+    } catch (err) {
+      setEmailError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOtpChange = (i, val) => {
+    if (!/^\d?$/.test(val)) return
+    const next = [...otp]
+    next[i] = val
+    setOtp(next)
+    if (val && i < 5) inputRefs.current[i + 1]?.focus()
+  }
+
+  const handleOtpKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !otp[i] && i > 0) inputRefs.current[i - 1]?.focus()
+  }
+
+  const handleOtpPaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const next = pasted.split('').concat(Array(6).fill('')).slice(0, 6)
+    setOtp(next)
+    inputRefs.current[Math.min(pasted.length, 5)]?.focus()
+    e.preventDefault()
+  }
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault()
+    if (otp.join('').length < 6) { setOtpError('Please enter the complete 6-digit OTP'); return }
+    setOtpError('')
+    setLoading(true)
+    try {
+      await verifyOtpChangeEmail(otp.join(''))
+      onSuccess()
+    } catch (err) {
+      setOtpError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-bold text-gray-800">
+            {step === 'email' ? 'Change Email' : 'Verify OTP'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer text-lg leading-none">✕</button>
+        </div>
+
+        {step === 'email' ? (
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            {/* Current Email */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Current Email</label>
+              <p className="text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">{currentEmail}</p>
+            </div>
+            {/* New Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                New Email Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                placeholder="newemail@example.com"
+                value={newEmail}
+                onChange={(e) => { setNewEmail(e.target.value); setEmailError('') }}
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${emailError ? 'border-red-400' : 'border-gray-300'}`}
+                autoFocus
+              />
+              {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+            </div>
+            <p className="text-xs text-gray-400">An OTP will be sent to your new email address.</p>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white transition-colors cursor-pointer" disabled={loading}>
+                {loading ? 'Sending...' : 'Send OTP'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleOtpSubmit} className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Enter the OTP sent to <span className="font-semibold text-gray-700">{newEmail}</span>
+            </p>
+            {/* OTP inputs */}
+            <div className="flex gap-2 justify-between" onPaste={handleOtpPaste}>
+              {otp.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={(el) => (inputRefs.current[i] = el)}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(i, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                  className={`w-10 h-11 text-center text-lg font-bold border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${otpError ? 'border-red-400' : 'border-gray-300'}`}
+                />
+              ))}
+            </div>
+            {otpError && <p className="text-red-500 text-xs">{otpError}</p>}
+            <button
+              type="button"
+              onClick={() => setStep('email')}
+              className="text-xs text-blue-600 hover:underline cursor-pointer"
+            >
+              ← Change email address
+            </button>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white transition-colors cursor-pointer" disabled={loading}>
+                {loading ? 'Verifying...' : 'Verify & Update'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function UpdateProfile() {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 600); return () => clearTimeout(t) }, [])
-  const [form, setForm] = useState({
-    name: currentCustomer.name,
-    phone: currentCustomer.phone,
-    email: currentCustomer.email,
-    address: currentCustomer.address,
-    zone: currentCustomer.zone,
-    gst: currentCustomer.gstNumber,
-  })
+  const { profile, profileLoading, refreshProfile } = useProfile()
+
+  const [zones, setZones] = useState([])
+  const [zonesLoading, setZonesLoading] = useState(true)
+  const [form, setForm] = useState(null)
   const [errors, setErrors] = useState({})
+  const [apiError, setApiError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  if (loading) return <Spinner />
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
+
+  useEffect(() => {
+    fetchZones()
+      .then(setZones)
+      .catch(() => setZones([]))
+      .finally(() => setZonesLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        name: profile.name ?? '',
+        phone: profile.phone ?? '',
+        address: profile.address ?? '',
+        zone: profile.zone?._id ?? '',
+        gst: profile.gstNumber ?? '',
+      })
+    }
+  }, [profile])
+
+  if (profileLoading || !form) return <Spinner />
 
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
@@ -31,7 +196,6 @@ export default function UpdateProfile() {
     const e = {}
     if (!form.name.trim()) e.name = 'Name is required'
     if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = 'Enter valid 10-digit mobile number'
-    if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter valid email'
     if (!form.address.trim()) e.address = 'Address is required'
     if (!form.zone) e.zone = 'Please select a zone'
     if (form.gst && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(form.gst))
@@ -39,31 +203,32 @@ export default function UpdateProfile() {
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    setApiError('')
+    setSaving(true)
+    try {
+      await updateProfile({
+        name: form.name,
+        phone: form.phone,
+        address: form.address,
+        zone: form.zone,
+        ...(form.gst && { gstNumber: form.gst }),
+      })
+      await refreshProfile()
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      setApiError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const Field = ({ label, fieldKey, props = {} }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} {props.required !== false && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        value={form[fieldKey]}
-        onChange={set(fieldKey)}
-        className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-          errors[fieldKey] ? 'border-red-400' : 'border-gray-300'
-        }`}
-        {...props}
-      />
-      {errors[fieldKey] && <p className="text-red-500 text-xs mt-1">{errors[fieldKey]}</p>}
-    </div>
-  )
+  const selectedZoneName = zones.find((z) => z._id === form.zone)?.name ?? profile.zone?.name ?? ''
 
   return (
     <Layout title="Update Profile" onBack={() => navigate(-1)}>
@@ -73,17 +238,30 @@ export default function UpdateProfile() {
           {/* Avatar */}
           <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
             <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
-              {form.name.charAt(0).toUpperCase()}
+              {getAvatarInitials(form.name)}
             </div>
             <div>
               <p className="text-base font-bold text-gray-800">{form.name}</p>
-              <p className="text-xs text-gray-400">{form.zone}</p>
+              <p className="text-xs text-gray-400">{selectedZoneName}</p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            <Field label="Full Name" fieldKey="name" props={{ type: 'text', placeholder: 'John Doe' }} />
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                value={form.name}
+                onChange={set('name')}
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.name ? 'border-red-400' : 'border-gray-300'}`}
+              />
+              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+            </div>
 
             {/* Phone */}
             <div>
@@ -100,15 +278,31 @@ export default function UpdateProfile() {
                   placeholder="9876543210"
                   value={form.phone}
                   onChange={set('phone')}
-                  className={`flex-1 border rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.phone ? 'border-red-400' : 'border-gray-300'
-                  }`}
+                  className={`flex-1 border rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.phone ? 'border-red-400' : 'border-gray-300'}`}
                 />
               </div>
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             </div>
 
-            <Field label="Email Address" fieldKey="email" props={{ type: 'email', placeholder: 'you@example.com' }} />
+            {/* Email — disabled with Change button */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={profile.email}
+                  disabled
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setEmailModalOpen(true)}
+                  className="shrink-0 px-4 py-2.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                >
+                  Change
+                </button>
+              </div>
+            </div>
 
             {/* Address */}
             <div>
@@ -120,9 +314,7 @@ export default function UpdateProfile() {
                 placeholder="Street, City, State, PIN"
                 value={form.address}
                 onChange={set('address')}
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                  errors.address ? 'border-red-400' : 'border-gray-300'
-                }`}
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${errors.address ? 'border-red-400' : 'border-gray-300'}`}
               />
               {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
             </div>
@@ -135,12 +327,13 @@ export default function UpdateProfile() {
               <select
                 value={form.zone}
                 onChange={set('zone')}
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white ${
-                  errors.zone ? 'border-red-400' : 'border-gray-300'
-                }`}
+                disabled={zonesLoading}
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white ${errors.zone ? 'border-red-400' : 'border-gray-300'}`}
               >
-                <option value="">Select your zone</option>
-                {ZONES.map((z) => <option key={z} value={z}>{z}</option>)}
+                <option value="">{zonesLoading ? 'Loading zones...' : 'Select your zone'}</option>
+                {zones.map((z) => (
+                  <option key={z._id} value={z._id}>{z.name}</option>
+                ))}
               </select>
               {errors.zone && <p className="text-red-500 text-xs mt-1">{errors.zone}</p>}
             </div>
@@ -156,9 +349,7 @@ export default function UpdateProfile() {
                 maxLength={15}
                 value={form.gst}
                 onChange={(e) => setForm({ ...form, gst: e.target.value.toUpperCase() })}
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase ${
-                  errors.gst ? 'border-red-400' : 'border-gray-300'
-                }`}
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase ${errors.gst ? 'border-red-400' : 'border-gray-300'}`}
               />
               {errors.gst && <p className="text-red-500 text-xs mt-1">{errors.gst}</p>}
             </div>
@@ -169,15 +360,28 @@ export default function UpdateProfile() {
               </div>
             )}
 
+            {apiError && (
+              <p className="text-red-500 text-sm text-center">{apiError}</p>
+            )}
+
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm cursor-pointer"
+              disabled={saving}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm cursor-pointer"
             >
-              Save Changes
+              {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </form>
         </div>
       </main>
+
+      {emailModalOpen && (
+        <ChangeEmailModal
+          currentEmail={profile.email}
+          onClose={() => setEmailModalOpen(false)}
+          onSuccess={() => { setEmailModalOpen(false); refreshProfile() }}
+        />
+      )}
     </Layout>
   )
 }

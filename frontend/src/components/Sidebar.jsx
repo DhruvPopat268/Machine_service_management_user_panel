@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { currentCustomer } from '../data/machines'
 import ConfirmModal from './ConfirmModal'
+import { logout } from '../api/auth'
+import { useProfile } from '../context/ProfileContext'
+import { getAvatarInitials } from '../utils/getAvatarInitials'
 
 const NAV_ITEMS = [
   { label: 'Home', path: '/' },
@@ -13,6 +15,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ open, onClose }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useProfile()
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -47,11 +50,11 @@ export default function Sidebar({ open, onClose }) {
           </div>
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
-              {currentCustomer.name.charAt(0)}
+              {getAvatarInitials(profile?.name)}
             </div>
             <div>
-              <p className="text-white font-semibold text-sm leading-tight">{currentCustomer.name}</p>
-              <p className="text-blue-200 text-xs mt-0.5">{currentCustomer.zone}</p>
+              <p className="text-white font-semibold text-sm leading-tight">{profile?.name ?? '—'}</p>
+              <p className="text-blue-200 text-xs mt-0.5">{profile?.zone?.name ?? '—'}</p>
             </div>
           </div>
         </div>
@@ -99,7 +102,7 @@ export default function Sidebar({ open, onClose }) {
         message="Are you sure you want to logout from the customer portal?"
         confirmLabel="Logout"
         confirmStyle="orange"
-        onConfirm={() => { setConfirmLogout(false); onClose(); navigate('/login') }}
+        onConfirm={async () => { setConfirmLogout(false); onClose(); await logout(); navigate('/login') }}
         onCancel={() => setConfirmLogout(false)}
       />
 

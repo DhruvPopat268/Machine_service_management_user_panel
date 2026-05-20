@@ -1,17 +1,6 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-
-const ZONES = [
-  'North Zone',
-  'South Zone',
-  'East Zone',
-  'West Zone',
-  'Central Zone',
-  'North-East Zone',
-  'North-West Zone',
-  'South-East Zone',
-  'South-West Zone',
-]
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { signup, fetchZones } from '../api/auth'
 
 const INITIAL = {
   name: '',
@@ -25,8 +14,20 @@ const INITIAL = {
 }
 
 export default function Signup() {
+  const navigate = useNavigate()
   const [form, setForm] = useState(INITIAL)
   const [errors, setErrors] = useState({})
+  const [apiError, setApiError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [zones, setZones] = useState([])
+  const [zonesLoading, setZonesLoading] = useState(true)
+
+  useEffect(() => {
+    fetchZones()
+      .then(setZones)
+      .catch(() => setZones([]))
+      .finally(() => setZonesLoading(false))
+  }, [])
 
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
@@ -44,12 +45,29 @@ export default function Signup() {
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
-    console.log('Signup:', form)
+    setApiError('')
+    setLoading(true)
+    try {
+      await signup({
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        password: form.password,
+        address: form.address,
+        zone: form.zone,
+        ...(form.gst && { gstNumber: form.gst }),
+      })
+      navigate('/')
+    } catch (err) {
+      setApiError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const field = (label, key, props = {}) => (
@@ -135,13 +153,14 @@ export default function Signup() {
             <select
               value={form.zone}
               onChange={set('zone')}
+              disabled={zonesLoading}
               className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white ${
                 errors.zone ? 'border-red-400' : 'border-gray-300'
               }`}
             >
-              <option value="">Select your zone</option>
-              {ZONES.map((z) => (
-                <option key={z} value={z}>{z}</option>
+              <option value="">{zonesLoading ? 'Loading zones...' : 'Select your zone'}</option>
+              {zones.map((z) => (
+                <option key={z._id} value={z._id}>{z.name}</option>
               ))}
             </select>
             {errors.zone && <p className="text-red-500 text-xs mt-1">{errors.zone}</p>}
@@ -171,11 +190,16 @@ export default function Signup() {
           {/* Confirm Password */}
           {field('Confirm Password', 'confirmPassword', { type: 'password', placeholder: 'Re-enter password' })}
 
+          {apiError && (
+            <p className="text-red-500 text-sm text-center">{apiError}</p>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm mt-2"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm mt-2"
           >
-            Create Account
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 

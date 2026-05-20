@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { verifyOtpResetPassword } from '../api/auth'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -10,6 +11,8 @@ export default function ResetPassword() {
   const [form, setForm] = useState({ password: '', confirmPassword: '' })
   const [errors, setErrors] = useState({})
   const [success, setSuccess] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const inputRefs = useRef([])
@@ -43,13 +46,26 @@ export default function ResetPassword() {
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
-    setSuccess(true)
-    setTimeout(() => navigate('/login', { state: { resetSuccess: true } }), 1500)
+    setApiError('')
+    setLoading(true)
+    try {
+      await verifyOtpResetPassword({
+        email,
+        otp: otp.join(''),
+        newPassword: form.password,
+      })
+      setSuccess(true)
+      setTimeout(() => navigate('/login', { state: { resetSuccess: true } }), 1500)
+    } catch (err) {
+      setApiError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -180,11 +196,16 @@ export default function ResetPassword() {
               {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
             </div>
 
+            {apiError && (
+              <p className="text-red-500 text-sm text-center">{apiError}</p>
+            )}
+
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm cursor-pointer"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm cursor-pointer"
             >
-              Reset Password
+              {loading ? 'Resetting...' : 'Reset Password'}
             </button>
           </form>
         )}

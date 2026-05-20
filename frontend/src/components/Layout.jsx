@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import ConfirmModal from './ConfirmModal'
-import { currentCustomer } from '../data/machines'
 import { initialNotifications } from '../data/notifications'
+import { logout } from '../api/auth'
+import { useProfile } from '../context/ProfileContext'
+import { getAvatarInitials } from '../utils/getAvatarInitials'
 
 const fmtAgo = (date) => {
   const diff = Math.floor((Date.now() - new Date(date)) / 1000)
@@ -14,6 +16,7 @@ const fmtAgo = (date) => {
 }
 
 export default function Layout({ title, subtitle, onBack, children }) {
+  const { profile } = useProfile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -175,7 +178,7 @@ export default function Layout({ title, subtitle, onBack, children }) {
               onClick={() => { setProfileOpen((p) => !p); setNotifOpen(false) }}
               className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:bg-blue-700 transition-colors"
             >
-              {currentCustomer.name.charAt(0).toUpperCase()}
+              {getAvatarInitials(profile?.name)}
             </button>
 
             {/* Profile Dropdown */}
@@ -183,8 +186,8 @@ export default function Layout({ title, subtitle, onBack, children }) {
               <div className="absolute right-0 top-11 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                 {/* Customer info */}
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-bold text-gray-800 truncate">{currentCustomer.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{currentCustomer.email}</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.name ?? '—'}</p>
+                  <p className="text-xs text-gray-400 truncate">{profile?.email ?? '—'}</p>
                 </div>
                 <div className="py-1">
                   <button
@@ -215,7 +218,7 @@ export default function Layout({ title, subtitle, onBack, children }) {
         message="Are you sure you want to logout from the customer portal?"
         confirmLabel="Logout"
         confirmStyle="orange"
-        onConfirm={() => { setConfirmLogout(false); navigate('/login') }}
+        onConfirm={async () => { setConfirmLogout(false); await logout(); navigate('/login') }}
         onCancel={() => setConfirmLogout(false)}
       />
     </div>
