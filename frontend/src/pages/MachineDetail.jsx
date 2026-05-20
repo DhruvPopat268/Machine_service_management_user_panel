@@ -11,9 +11,9 @@ const fmtCurrency = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
 const Row = ({ label, value }) => (
-  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start py-2.5 border-b border-gray-100 last:border-0 gap-0.5 sm:gap-4">
-    <span className="text-xs font-semibold text-gray-400 sm:text-sm sm:font-normal sm:text-gray-500 sm:w-40 shrink-0">{label}</span>
-    <span className="text-sm font-medium text-gray-800 sm:text-right break-words">{value ?? '—'}</span>
+  <div className="flex flex-row justify-between items-start py-2.5 border-b border-gray-100 last:border-0 gap-4">
+    <span className="text-xs text-gray-500 shrink-0">{label}</span>
+    <span className="text-xs font-medium text-gray-800 text-right break-words">{value ?? '—'}</span>
   </div>
 )
 
