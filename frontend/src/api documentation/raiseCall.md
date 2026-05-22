@@ -370,6 +370,109 @@ console.log(response.data);
    - Updates status to "Assigned"
 8. Engineer receives notification and starts work
 
+---
+
+## Get Dashboard Stats
+
+### Endpoint
+```
+GET /api/customer/service-calls/dashboard
+```
+
+### Authentication
+Requires customer authentication token in headers:
+```
+Authorization: Bearer <customer_token>
+```
+
+### Description
+Returns aggregated data for the customer's home page dashboard including stats, first 5 expired contract machines, and first 5 active calls.
+
+### Response
+
+#### Success Response (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "stats": {
+      "totalOwnedMachines": 10,
+      "expiredContractMachines": 3,
+      "totalRaisedCalls": 8,
+      "totalCompletedCalls": 5
+    },
+    "expiredContractMachines": [
+      {
+        "machineId": "6a0d8b2c3cc33d96e78563a5",
+        "machineName": "CNC Machine X200",
+        "modelNumber": "X200",
+        "category": "Heavy Machinery",
+        "division": "CNC Division",
+        "variant": {
+          "_id": "6a0d8b2c3cc33d96e78563b1",
+          "attribute": "6a0d8b2c3cc33d96e78563c1",
+          "name": "Red",
+          "value": "Red",
+          "quantity": 1,
+          "price": 50000,
+          "discountedPrice": null,
+          "total": 50000,
+          "contractType": {
+            "contractTypeId": "6a0d8b2c3cc33d96e78563a4",
+            "name": "Premium Support",
+            "code": "PREM",
+            "freeService": true,
+            "freeParts": false,
+            "validFrom": "2023-01-01T00:00:00.000Z",
+            "validTo": "2024-01-01T00:00:00.000Z"
+          },
+          "deductedFromInventory": true
+        }
+      }
+    ],
+    "activeCalls": [
+      {
+        "_id": "6a0d8b2c3cc33d96e78563c5",
+        "callId": "SC-1",
+        "machines": [
+          {
+            "machineName": "CNC Machine X200",
+            "modelNumber": "X200",
+            "division": "CNC Division",
+            "category": "Heavy Machinery",
+            "issueDescription": "Machine not starting properly",
+            "problemType": "Electrical Issue"
+          }
+        ],
+        "status": "In Progress",
+        "priority": "High",
+        "engineerInfo": {
+          "engineerId": "6a0d8b2c3cc33d96e78563d1",
+          "name": "Engineer Name"
+        },
+        "dates": {
+          "created": "2024-01-15T10:30:00.000Z",
+          "assigned": "2024-01-15T11:00:00.000Z",
+          "inProgress": "2024-01-15T12:00:00.000Z"
+        },
+        "createdAt": "2024-01-15T10:30:00.000Z",
+        "updatedAt": "2024-01-15T12:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### Error Response (500 Internal Server Error)
+```json
+{
+  "success": false,
+  "message": "Failed to fetch dashboard stats"
+}
+```
+
+---
+
 
 ---
 

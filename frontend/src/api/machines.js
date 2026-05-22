@@ -33,6 +33,9 @@ export const fetchCancelledCalls = () =>
 export const fetchCallDetail = (id) =>
   axiosInstance.get(`${SC_BASE}/${id}`).then(unwrap).then((d) => d.data)
 
+export const fetchDashboard = () =>
+  axiosInstance.get(`${SC_BASE}/dashboard`).then(unwrap).then((d) => d.data)
+
 export const raiseServiceCall = (selected) => {
   const formData = new FormData()
   const serviceCalls = Object.entries(selected).map(([variantId, detail]) => ({

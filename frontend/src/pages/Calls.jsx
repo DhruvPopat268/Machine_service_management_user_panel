@@ -18,6 +18,15 @@ const STATUS_STYLES = {
   'Cancelled':   'bg-red-50 text-red-500',
 }
 
+const STATUS_BORDER = {
+  'Open':        'border-l-blue-400',
+  'Assigned':    'border-l-purple-400',
+  'In Progress': 'border-l-yellow-400',
+  'On Hold':     'border-l-orange-400',
+  'Completed':   'border-l-green-400',
+  'Cancelled':   'border-l-red-400',
+}
+
 const PRIORITY_STYLES = {
   'Critical': 'bg-red-100 text-red-600',
   'High':     'bg-orange-100 text-orange-600',
@@ -70,7 +79,7 @@ export default function Calls() {
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 activeTab === tab
-                  ? 'bg-white text-blue-600 shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-md'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -90,7 +99,7 @@ export default function Calls() {
             {calls.length === 0 ? (
               <div className="text-center py-16 text-gray-400 text-sm">No {activeTab.toLowerCase()} calls</div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {calls.map((call) => {
                   const createdAt = call.dates?.created
                   const completedAt = call.dates?.completed
@@ -100,7 +109,7 @@ export default function Calls() {
                     <div
                       key={call._id}
                       onClick={() => navigate(`/calls/${call._id}`)}
-                      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
+                      className={`bg-white rounded-2xl border border-gray-100 border-l-4 shadow-sm p-5 cursor-pointer hover:shadow-md transition-all ${STATUS_BORDER[call.status] ?? 'border-l-gray-300'}`}
                     >
                       {/* Header row — Call ID + status + date */}
                       <div className="flex items-start justify-between gap-3 mb-4">
@@ -128,16 +137,28 @@ export default function Calls() {
                           <div key={m.variantId ?? i} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                             <p className="text-sm font-bold text-gray-800">{m.machineName}</p>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                              <p className="text-xs text-gray-500">Variant <span className="font-medium text-gray-700">{m.attributeName}: {m.attributeValue}</span></p>
-                              <p className="text-xs text-gray-500">Model No <span className="font-medium text-gray-700">{m.modelNumber}</span></p>
-                              <p className="text-xs text-gray-500">Category <span className="font-medium text-gray-700">{m.category}</span></p>
-                              <p className="text-xs text-gray-500">Division <span className="font-medium text-gray-700">{m.division}</span></p>
+                              <p className="text-xs"><span className="text-gray-400">Variant :</span> <span className="font-medium text-gray-700">{m.attributeName}: {m.attributeValue}</span></p>
+                              <p className="text-xs"><span className="text-gray-400">Model No :</span> <span className="font-medium text-gray-700">{m.modelNumber}</span></p>
+                              <p className="text-xs"><span className="text-gray-400">Category :</span> <span className="font-medium text-gray-700">{m.category}</span></p>
+                              <p className="text-xs"><span className="text-gray-400">Division :</span> <span className="font-medium text-gray-700">{m.division}</span></p>
                             </div>
                             {m.problemType && (
-                              <p className="text-xs text-gray-500">Problem <span className="font-medium text-gray-700">{m.problemType}</span></p>
+                              <p className="text-xs"><span className="text-gray-400">Problem :</span> <span className="font-medium text-gray-700">{m.problemType}</span></p>
                             )}
                             {m.issueDescription && (
-                              <p className="text-xs text-gray-500 pt-1 border-t border-gray-200">Description <span className="font-medium text-gray-700">{m.issueDescription}</span></p>
+                              <p className="text-xs pt-1 border-t border-gray-200"><span className="text-gray-400">Description :</span> <span className="font-medium text-gray-700">{m.issueDescription}</span></p>
+                            )}
+                            {m.images?.length > 0 && (
+                              <div className="pt-1 border-t border-gray-200">
+                                <p className="text-xs text-gray-400 mb-1.5">Attachments :</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {m.images.map((img, idx) => (
+                                    <a key={idx} href={img} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                                      <img src={img} alt={`img ${idx + 1}`} className="w-12 h-12 rounded-lg object-cover border border-gray-200 hover:opacity-80 transition-opacity" />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
                         ))}
