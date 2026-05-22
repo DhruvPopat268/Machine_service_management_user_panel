@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
-import { ownedMachines } from '../data/machines'
-import { calls } from '../data/calls'
-
-const ACTIVE_STATUSES = ['Open', 'Assigned', 'In Progress', 'On Hold']
+import { fetchDashboard } from '../api/machines'
 
 const fmt = (date) =>
   new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -24,54 +21,46 @@ const PRIORITY_STYLES = {
   'Low':      'bg-gray-100 text-gray-500',
 }
 
-// derive stats
-const now = new Date()
-const totalMachines = ownedMachines.length
-const totalRaisedCalls = calls.length
-const totalCompletedCalls = calls.filter((c) => c.status === 'Completed').length
-const activeCalls = calls.filter((c) => ACTIVE_STATUSES.includes(c.status))
-
-// expired: any variant whose contract validTo is in the past
-const expiredMachines = ownedMachines.filter((m) =>
-  m.variants.some((v) => new Date(v.contractType.validTo) < now)
-)
-
-const STAT_CARDS = [
-  {
-    label: 'Total Owned Machines',
-    value: totalMachines,
-    bg: 'bg-blue-50',
-    valueColor: 'text-blue-600',
-    labelColor: 'text-blue-400',
-  },
-  {
-    label: 'Total Raised Calls',
-    value: totalRaisedCalls,
-    bg: 'bg-orange-50',
-    valueColor: 'text-orange-500',
-    labelColor: 'text-orange-400',
-  },
-  {
-    label: 'Completed Calls',
-    value: totalCompletedCalls,
-    bg: 'bg-green-50',
-    valueColor: 'text-green-600',
-    labelColor: 'text-green-400',
-  },
-]
-
 export default function Home() {
   const navigate = useNavigate()
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 600); return () => clearTimeout(t) }, [])
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchDashboard()
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
   if (loading) return <Spinner />
+
+  if (error) {
+    return (
+      <Layout title="Home">
+        <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+          <p className="text-red-500 text-sm">{error}</p>
+        </div>
+      </Layout>
+    )
+  }
+
+  const { stats, expiredContractMachines, activeCalls } = data
+
+  const STAT_CARDS = [
+    { label: 'Total Owned Machines',    value: stats.totalOwnedMachines,      bg: 'bg-blue-50',   valueColor: 'text-blue-600',   labelColor: 'text-blue-400'   },
+    { label: 'Expired Contracts',       value: stats.expiredContractMachines, bg: 'bg-red-50',    valueColor: 'text-red-500',    labelColor: 'text-red-400'    },
+    { label: 'Total Raised Calls',      value: stats.totalRaisedCalls,        bg: 'bg-orange-50', valueColor: 'text-orange-500', labelColor: 'text-orange-400' },
+    { label: 'Completed Calls',         value: stats.totalCompletedCalls,     bg: 'bg-green-50',  valueColor: 'text-green-600',  labelColor: 'text-green-400'  },
+  ]
 
   return (
     <Layout title="Home">
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-8">
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {STAT_CARDS.map(({ label, value, bg, valueColor, labelColor }) => (
             <div key={label} className={`${bg} rounded-2xl p-3 sm:p-4 flex flex-col gap-1`}>
               <span className={`text-xl sm:text-2xl font-bold ${valueColor}`}>{value}</span>
@@ -84,24 +73,21 @@ export default function Home() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-gray-700">Expired Contracts Machines</h2>
-            <span className="text-xs text-gray-400">{expiredMachines.length} machine(s)</span>
+            <span className="text-xs text-gray-400">{stats.expiredContractMachines} machine(s)</span>
           </div>
 
-          {expiredMachines.length === 0 ? (
+          {expiredContractMachines.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center text-sm text-gray-400">
               No expired contracts
             </div>
           ) : (
             <div className="space-y-3">
-              {expiredMachines.map((machine) => {
-                const expiredVariants = machine.variants.filter(
-                  (v) => new Date(v.contractType.validTo) < now
-                )
-                const contract = expiredVariants[0]?.contractType
+              {expiredContractMachines.map((machine) => {
+                const contract = machine.variant?.contractType
                 return (
                   <div
-                    key={machine.id}
-                    onClick={() => navigate(`/machines/${machine.id}`)}
+                    key={machine.variant?._id ?? machine.machineId}
+                    onClick={() => navigate(`/machines/${machine.variant?._id}`)}
                     className="bg-white rounded-2xl border border-red-100 p-4 cursor-pointer hover:shadow-md hover:border-red-200 transition-all"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -144,27 +130,36 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-3">
-              {activeCalls.slice(0, 3).map((call) => (
+              {activeCalls.map((call) => (
                 <div
-                  key={call.id}
-                  onClick={() => navigate(`/calls/${call.id}`)}
+                  key={call._id}
+                  onClick={() => navigate(`/calls/${call._id}`)}
                   className="bg-white rounded-2xl border border-gray-100 p-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-400 mb-0.5">{call.ticketNumber}</p>
-                      <p className="text-sm font-bold text-gray-800 leading-snug">{call.issueTitle}</p>
+                      <p className="text-xs text-gray-400 mb-0.5">{call.callId}</p>
+                      <p className="text-sm font-bold text-gray-800 leading-snug">
+                        {call.machines?.[0]?.machineName ?? 'Service Call'}
+                        {call.machines?.length > 1 && (
+                          <span className="text-xs font-normal text-gray-400"> +{call.machines.length - 1} more</span>
+                        )}
+                      </p>
                     </div>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[call.status]}`}>
                       {call.status}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-2">{call.machineName} · {call.modelNumber}</p>
+                  <p className="text-xs text-gray-400 mb-2">
+                    {call.machines?.[0]?.category} · {call.machines?.[0]?.division}
+                  </p>
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${PRIORITY_STYLES[call.priority]}`}>
-                      {call.priority} Priority
-                    </span>
-                    <span className="text-xs text-gray-400">{fmt(call.raisedAt)}</span>
+                    {call.priority && (
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${PRIORITY_STYLES[call.priority]}`}>
+                        {call.priority} Priority
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400 ml-auto">{fmt(call.dates?.created)}</span>
                   </div>
                 </div>
               ))}
