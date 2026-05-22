@@ -2,17 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
-import { calls } from '../data/calls'
-
-const ACTIVE_STATUSES = ['Open', 'Assigned', 'In Progress', 'On Hold']
+import { fetchActiveCalls, fetchCompletedCalls, fetchCancelledCalls } from '../api/machines'
 
 const TABS = ['Active', 'Completed', 'Cancelled']
 
 const fmt = (date) =>
   new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-
-const fmtTime = (date) =>
-  new Date(date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
 
 const STATUS_STYLES = {
   'Open':        'bg-blue-50 text-blue-600',
@@ -30,19 +25,28 @@ const PRIORITY_STYLES = {
   'Low':      'bg-gray-100 text-gray-500',
 }
 
+const FETCHERS = {
+  Active:    fetchActiveCalls,
+  Completed: fetchCompletedCalls,
+  Cancelled: fetchCancelledCalls,
+}
+
 export default function Calls() {
   const location = useLocation()
-  const [activeTab, setActiveTab] = useState(location.state?.defaultTab ?? 'Active')
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState(location.state?.defaultTab ?? 'Active')
+  const [calls, setCalls] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 600); return () => clearTimeout(t) }, [])
-  if (loading) return <Spinner />
+  const [error, setError] = useState('')
 
-  const filtered = calls.filter((c) => {
-    if (activeTab === 'Active') return ACTIVE_STATUSES.includes(c.status)
-    if (activeTab === 'Completed') return c.status === 'Completed'
-    return c.status === 'Cancelled'
-  })
+  useEffect(() => {
+    setLoading(true)
+    setError('')
+    FETCHERS[activeTab]()
+      .then(setCalls)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [activeTab])
 
   return (
     <Layout title="My Calls">
@@ -75,64 +79,99 @@ export default function Calls() {
           ))}
         </div>
 
-        {/* Count */}
-        <p className="text-xs text-gray-400 mb-4">{filtered.length} call(s) found</p>
-
-        {/* Call Cards */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 text-sm">No {activeTab.toLowerCase()} calls</div>
+        {loading ? (
+          <div className="flex justify-center py-16"><Spinner /></div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
         ) : (
-          <div className="space-y-4">
-            {filtered.map((call) => (
-              <div
-                key={call.id}
-                onClick={() => navigate(`/calls/${call.id}`)}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
-              >
-                {/* Top row */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400 mb-0.5">{call.ticketNumber}</p>
-                    <h3 className="text-sm font-bold text-gray-800 leading-snug">{call.issueTitle}</h3>
-                  </div>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[call.status]}`}>
-                    {call.status}
-                  </span>
-                </div>
+          <>
+            <p className="text-xs text-gray-400 mb-4">{calls.length} call(s) found</p>
 
-                {/* Machine */}
-                <div className="flex items-center gap-1.5 mb-3">
-                  <span className="text-xs text-gray-500">{call.machineName}</span>
-                  <span className="text-gray-300 text-xs">·</span>
-                  <span className="text-xs text-gray-400">{call.modelNumber}</span>
-                </div>
+            {calls.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 text-sm">No {activeTab.toLowerCase()} calls</div>
+            ) : (
+              <div className="space-y-4">
+                {calls.map((call) => {
+                  const createdAt = call.dates?.created
+                  const completedAt = call.dates?.completed
+                  const cancelledAt = call.dates?.cancelled
 
-                {/* Priority + Contract */}
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${PRIORITY_STYLES[call.priority]}`}>
-                    {call.priority} Priority
-                  </span>
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
-                    {call.contractCode}
-                  </span>
-                </div>
+                  return (
+                    <div
+                      key={call._id}
+                      onClick={() => navigate(`/calls/${call._id}`)}
+                      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
+                    >
+                      {/* Header row — Call ID + status + date */}
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{call.callId}</p>
+                          {call.priority && (
+                            <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_STYLES[call.priority]}`}>
+                              {call.priority} Priority
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[call.status]}`}>
+                            {call.status}
+                          </span>
+                        </div>
+                      </div>
 
-                {/* Footer */}
-                <div className="flex flex-wrap justify-between items-center gap-1 pt-3 border-t border-gray-100 text-xs text-gray-400">
-                  <span>Raised: {fmt(call.raisedAt)} {fmtTime(call.raisedAt)}</span>
-                  {call.engineer && (
-                    <span className="text-gray-500 font-medium">{call.engineer.name}</span>
-                  )}
-                  {call.resolvedAt && (
-                    <span className="text-green-500 font-medium">Resolved: {fmt(call.resolvedAt)}</span>
-                  )}
-                  {call.cancelledAt && !call.resolvedAt && (
-                    <span className="text-red-400 font-medium">Cancelled: {fmt(call.cancelledAt)}</span>
-                  )}
-                </div>
+                      {/* Machines */}
+                      <div className="space-y-3 mb-4">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                          Machines ({call.machines?.length ?? 0})
+                        </p>
+                        {call.machines?.map((m, i) => (
+                          <div key={m.variantId ?? i} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+                            <p className="text-sm font-bold text-gray-800">{m.machineName}</p>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                              <p className="text-xs text-gray-500">Variant <span className="font-medium text-gray-700">{m.attributeName}: {m.attributeValue}</span></p>
+                              <p className="text-xs text-gray-500">Model No <span className="font-medium text-gray-700">{m.modelNumber}</span></p>
+                              <p className="text-xs text-gray-500">Category <span className="font-medium text-gray-700">{m.category}</span></p>
+                              <p className="text-xs text-gray-500">Division <span className="font-medium text-gray-700">{m.division}</span></p>
+                            </div>
+                            {m.problemType && (
+                              <p className="text-xs text-gray-500">Problem <span className="font-medium text-gray-700">{m.problemType}</span></p>
+                            )}
+                            {m.issueDescription && (
+                              <p className="text-xs text-gray-500 pt-1 border-t border-gray-200">Description <span className="font-medium text-gray-700">{m.issueDescription}</span></p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer — engineer + resolved/cancelled date */}
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${call.engineerInfo?.name ? 'bg-green-500' : 'bg-gray-300'}`} />
+                          <span className="text-xs text-gray-500">
+                            {call.engineerInfo?.name
+                              ? <span className="font-medium text-gray-700">{call.engineerInfo.name}</span>
+                              : 'Engineer not assigned'
+                            }
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {completedAt && (
+                            <span className="text-xs text-green-500 font-medium">Completed: {fmt(completedAt)}</span>
+                          )}
+                          {cancelledAt && (
+                            <span className="text-xs text-red-400 font-medium">Cancelled: {fmt(cancelledAt)}</span>
+                          )}
+                          {createdAt && (
+                            <span className="text-[11px] text-gray-400">{fmt(createdAt)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </main>
     </Layout>

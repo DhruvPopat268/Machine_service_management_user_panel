@@ -2,83 +2,135 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
-import { ownedMachines } from '../data/machines'
+import { fetchAllOwnedMachines, fetchProblemTypes, raiseServiceCall } from '../api/machines'
 
-const PROBLEM_TYPES = [
-  'Machine Not Starting',
-  'Unusual Noise / Vibration',
-  'Overheating',
-  'Power / Electrical Issue',
-  'Hydraulic / Pneumatic Leak',
-  'Software / Control Error',
-  'Mechanical Breakdown',
-  'Coolant System Failure',
-  'Sensor / Calibration Issue',
-  'Routine Maintenance Request',
-  'Other',
-]
-
-const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
-
-const PRIORITY_STYLES = {
-  Low:      'border-gray-300 bg-gray-50 text-gray-600',
-  Medium:   'border-yellow-400 bg-yellow-50 text-yellow-700',
-  High:     'border-orange-400 bg-orange-50 text-orange-700',
-  Critical: 'border-red-400 bg-red-50 text-red-600',
-}
+const emptyDetail = () => ({ issueDescription: '', problemTypeId: '', photos: [] })
 
 export default function RaiseCall() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 600); return () => clearTimeout(t) }, [])
+  const [error, setError] = useState('')
+  const [variants, setVariants] = useState([])
+  const [problemTypes, setProblemTypes] = useState([])
 
-  const [form, setForm] = useState({
-    machineId: '',
-    problemType: '',
-    description: '',
-    priority: 'Medium',
-  })
-  const [photos, setPhotos] = useState([]) // { file, preview }
+  useEffect(() => {
+    Promise.all([fetchAllOwnedMachines(), fetchProblemTypes()])
+      .then(([machinesData, ptData]) => {
+        // Flatten machines → variants, keep only needed fields
+        const flat = (machinesData.machines ?? machinesData).flatMap((item) => {
+          const { variant } = item
+          return [{
+            variantId: variant._id,
+            machineName: item.machineName,
+            category: item.category,
+            division: item.division,
+            attributeName: variant.name,
+            attributeValue: variant.value,
+          }]
+        })
+        setVariants(flat)
+        setProblemTypes(ptData.problemTypes ?? ptData)
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  // variantId → detail object
+  const [selected, setSelected] = useState({})
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [apiError, setApiError] = useState('')
 
   if (loading) return <Spinner />
 
-  const selectedMachine = ownedMachines.find((m) => m.id === form.machineId)
+  if (error) {
+    return (
+      <Layout title="Raise Call" onBack={() => navigate('/calls')}>
+        <div className="max-w-md mx-auto px-4 py-16 text-center">
+          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <button onClick={() => navigate('/calls')} className="text-blue-600 hover:underline text-sm cursor-pointer">← Back to Calls</button>
+        </div>
+      </Layout>
+    )
+  }
 
-  const handlePhotoChange = (e) => {
+  const selectedIds = Object.keys(selected)
+
+  const toggleVariant = (variantId) => {
+    setSelected((prev) => {
+      if (prev[variantId]) {
+        prev[variantId].photos.forEach((p) => URL.revokeObjectURL(p.preview))
+        const next = { ...prev }
+        delete next[variantId]
+        return next
+      }
+      return { ...prev, [variantId]: emptyDetail() }
+    })
+    setErrors((prev) => { const e = { ...prev }; delete e[variantId]; return e })
+  }
+
+  const updateDetail = (variantId, field, value) => {
+    setSelected((prev) => ({ ...prev, [variantId]: { ...prev[variantId], [field]: value } }))
+    if (field === 'issueDescription') {
+      setErrors((prev) => { const e = { ...prev }; delete e[variantId]; return e })
+    }
+  }
+
+  const handlePhotoChange = (variantId, e) => {
     const files = Array.from(e.target.files)
-    const remaining = 5 - photos.length
+    const current = selected[variantId].photos
+    const remaining = 5 - current.length
     const toAdd = files.slice(0, remaining).map((file) => ({
       file,
       preview: URL.createObjectURL(file),
     }))
-    setPhotos((prev) => [...prev, ...toAdd])
+    updateDetail(variantId, 'photos', [...current, ...toAdd])
     e.target.value = ''
   }
 
-  const removePhoto = (i) => {
-    setPhotos((prev) => {
-      URL.revokeObjectURL(prev[i].preview)
-      return prev.filter((_, idx) => idx !== i)
-    })
+  const removePhoto = (variantId, i) => {
+    const photos = selected[variantId].photos
+    URL.revokeObjectURL(photos[i].preview)
+    updateDetail(variantId, 'photos', photos.filter((_, idx) => idx !== i))
   }
 
   const validate = () => {
     const e = {}
-    if (!form.machineId) e.machineId = 'Please select a machine'
-    if (!form.problemType) e.problemType = 'Please select a problem type'
-    if (!form.description.trim()) e.description = 'Please describe the issue'
-    else if (form.description.trim().length < 20) e.description = 'Description must be at least 20 characters'
+    if (selectedIds.length === 0) {
+      e.__global = 'Please select at least one machine variant'
+      return e
+    }
+    selectedIds.forEach((id) => {
+      const desc = selected[id].issueDescription.trim()
+      if (!desc) e[id] = 'Issue description is required'
+      else if (desc.length < 10) e[id] = 'Description must be at least 10 characters'
+    })
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
-    setSubmitted(true)
+    setApiError('')
+    setSubmitting(true)
+    try {
+      await raiseServiceCall(selected)
+      setSubmitted(true)
+    } catch (err) {
+      setApiError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleRaiseAnother = () => {
+    setSubmitted(false)
+    setSelected({})
+    setErrors({})
+    setApiError('')
   }
 
   if (submitted) {
@@ -92,7 +144,7 @@ export default function RaiseCall() {
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Call Raised Successfully!</h2>
           <p className="text-sm text-gray-500 mb-1">Your service call has been submitted.</p>
-          <p className="text-sm text-gray-500 mb-8">Our team will assign an engineer shortly.</p>
+          <p className="text-sm text-gray-500 mb-8">Our team will review and assign an engineer shortly.</p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => navigate('/calls')}
@@ -101,7 +153,7 @@ export default function RaiseCall() {
               View My Calls
             </button>
             <button
-              onClick={() => { setSubmitted(false); setForm({ machineId: '', problemType: '', description: '', priority: 'Medium' }); setPhotos([]) }}
+              onClick={handleRaiseAnother}
               className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer"
             >
               Raise Another
@@ -117,183 +169,212 @@ export default function RaiseCall() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* Select Machine */}
+          {/* Step 1 — Select Variants */}
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Select Machine</h3>
-
-            <div className="space-y-3">
-              {ownedMachines.map((machine) => (
-                <label
-                  key={machine.id}
-                  className={`flex items-center gap-4 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                    form.machineId === machine.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-100 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="machine"
-                    value={machine.id}
-                    checked={form.machineId === machine.id}
-                    onChange={() => setForm({ ...form, machineId: machine.id })}
-                    className="hidden"
-                  />
-                  <img
-                    src={machine.images[0]}
-                    alt={machine.machineName}
-                    className="w-14 h-14 rounded-xl object-cover shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-800 leading-tight">{machine.machineName}</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                      {machine.variants.map((v, i) => (
-                        <p key={i} className="text-xs text-gray-500">
-                          Variant: <span className="font-medium text-gray-700">{v.name} — {v.value}</span>
-                        </p>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">{machine.modelNumber} · {machine.category}</p>
-                    <p className="text-xs text-gray-400">{machine.serialNumber}</p>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
-                    form.machineId === machine.id ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                  }`}>
-                    {form.machineId === machine.id && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </div>
-                </label>
-              ))}
-            </div>
-            {errors.machineId && <p className="text-red-500 text-xs mt-2">{errors.machineId}</p>}
-          </section>
-
-          {/* Problem Type & Priority */}
-          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Issue Details</h3>
-
-            {/* Problem Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Problem Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.problemType}
-                onChange={(e) => setForm({ ...form, problemType: e.target.value })}
-                className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white ${
-                  errors.problemType ? 'border-red-400' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Select problem type</option>
-                {PROBLEM_TYPES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              {errors.problemType && <p className="text-red-500 text-xs mt-1">{errors.problemType}</p>}
-            </div>
-
-            {/* Priority */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-              <div className="grid grid-cols-4 gap-2">
-                {PRIORITY_OPTIONS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setForm({ ...form, priority: p })}
-                    className={`py-2 rounded-xl text-xs font-semibold border-2 transition-all cursor-pointer ${
-                      form.priority === p
-                        ? PRIORITY_STYLES[p]
-                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                rows={4}
-                placeholder="Describe the issue in detail — when it started, what you observed, any error codes..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                  errors.description ? 'border-red-400' : 'border-gray-300'
-                }`}
-              />
-              <div className="flex justify-between items-center mt-1">
-                {errors.description
-                  ? <p className="text-red-500 text-xs">{errors.description}</p>
-                  : <span />
-                }
-                <span className="text-xs text-gray-400">{form.description.length} chars</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Photo Upload */}
-          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">
-              Upload Photos <span className="text-gray-300 font-normal normal-case">(Optional · max 5)</span>
-            </h3>
-
-            <div className="flex flex-wrap gap-3">
-              {photos.map((p, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0">
-                  <img src={p.preview} alt={`photo ${i + 1}`} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(i)}
-                    className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-xs cursor-pointer leading-none"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-
-              {photos.length < 5 && (
-                <label className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 flex flex-col items-center justify-center cursor-pointer transition-colors shrink-0">
-                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="text-[10px] text-gray-400 mt-1">Add Photo</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handlePhotoChange}
-                  />
-                </label>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                Select Machine Variants
+              </h3>
+              {selectedIds.length > 0 && (
+                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                  {selectedIds.length} selected
+                </span>
               )}
             </div>
-            <p className="text-xs text-gray-400 mt-3">{photos.length}/5 photos added</p>
+
+            <div className="space-y-2">
+              {variants.map((v) => {
+                const isSelected = !!selected[v.variantId]
+                return (
+                  <div
+                    key={v.variantId}
+                    onClick={() => toggleVariant(v.variantId)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-100 hover:border-gray-300'
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <div className={`w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-all ${
+                      isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
+                    }`}>
+                      {isSelected && (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-800 leading-tight truncate">{v.machineName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {v.attributeName}: <span className="font-medium text-gray-700">{v.attributeValue}</span>
+                      </p>
+                      <p className="text-xs text-gray-400">{v.category} · {v.division}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {errors.__global && (
+              <p className="text-red-500 text-xs mt-3">{errors.__global}</p>
+            )}
           </section>
 
-          {/* Summary preview if machine selected */}
-          {selectedMachine && (
-            <section className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-wide mb-2">Call Summary</p>
-              <p className="text-sm font-semibold text-gray-800">{selectedMachine.machineName}</p>
-              <p className="text-xs text-gray-500">{selectedMachine.serialNumber}</p>
-              {form.problemType && <p className="text-xs text-gray-600 mt-1">Issue: {form.problemType}</p>}
-              <p className="text-xs text-gray-600">Priority: <span className="font-semibold">{form.priority}</span></p>
+          {/* Step 2 — Per-variant issue details */}
+          {selectedIds.length > 0 && (
+            <section className="space-y-4">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">
+                Issue Details — {selectedIds.length} variant{selectedIds.length > 1 ? 's' : ''}
+              </h3>
+
+              {selectedIds.map((variantId, idx) => {
+                const v = variants.find((x) => x.variantId === variantId)
+                const detail = selected[variantId]
+                const hasError = !!errors[variantId]
+
+                return (
+                  <div key={variantId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                    {/* Variant header */}
+                    <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                      <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-800 leading-tight">{v.machineName}</p>
+                        <p className="text-xs text-gray-400">{v.attributeName}: {v.attributeValue}</p>
+                      </div>
+                    </div>
+
+                    {/* Problem Type (optional) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Problem Type <span className="text-gray-400 font-normal">(Optional)</span>
+                      </label>
+                      <select
+                        value={detail.problemTypeId}
+                        onChange={(e) => updateDetail(variantId, 'problemTypeId', e.target.value)}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      >
+                        <option value="">Select problem type</option>
+                        {problemTypes.map((p) => (
+                          <option key={p._id} value={p._id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Issue Description (required) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Issue Description <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Describe the issue — when it started, what you observed, any error codes..."
+                        value={detail.issueDescription}
+                        onChange={(e) => updateDetail(variantId, 'issueDescription', e.target.value)}
+                        className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                          hasError ? 'border-red-400' : 'border-gray-300'
+                        }`}
+                      />
+                      <div className="flex justify-between items-center mt-1">
+                        {hasError
+                          ? <p className="text-red-500 text-xs">{errors[variantId]}</p>
+                          : <span />
+                        }
+                        <span className="text-xs text-gray-400">{detail.issueDescription.length} chars</span>
+                      </div>
+                    </div>
+
+                    {/* Photos (optional, per-variant) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Photos <span className="text-gray-400 font-normal">(Optional · max 5)</span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {detail.photos.map((p, i) => (
+                          <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0">
+                            <img src={p.preview} alt={`photo ${i + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removePhoto(variantId, i) }}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-[10px] cursor-pointer leading-none"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        {detail.photos.length < 5 && (
+                          <label
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 flex flex-col items-center justify-center cursor-pointer transition-colors shrink-0"
+                          >
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span className="text-[9px] text-gray-400 mt-0.5">Add</span>
+                            <input
+                              type="file"
+                              accept="image/jpg,image/jpeg,image/png,image/webp"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => handlePhotoChange(variantId, e)}
+                            />
+                          </label>
+                        )}
+                      </div>
+                      {detail.photos.length > 0 && (
+                        <p className="text-xs text-gray-400 mt-1.5">{detail.photos.length}/5 photos</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </section>
+          )}
+
+          {/* Summary */}
+          {selectedIds.length > 0 && (
+            <section className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
+              <p className="text-xs font-bold text-blue-400 uppercase tracking-wide mb-2">Summary</p>
+              <div className="space-y-1">
+                {selectedIds.map((variantId, idx) => {
+                  const v = variants.find((x) => x.variantId === variantId)
+                  const detail = selected[variantId]
+                  const pt = problemTypes.find((p) => p._id === detail.problemTypeId)
+                  return (
+                    <div key={variantId} className="flex items-start gap-2 text-xs text-gray-600">
+                      <span className="font-semibold text-blue-500 shrink-0">{idx + 1}.</span>
+                      <span>
+                        <span className="font-semibold text-gray-800">{v.machineName}</span>
+                        {' '}({v.attributeValue})
+                        {pt && <span className="text-gray-500"> — {pt.name}</span>}
+                        {detail.photos.length > 0 && (
+                          <span className="text-gray-400"> · {detail.photos.length} photo{detail.photos.length > 1 ? 's' : ''}</span>
+                        )}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* API Error */}
+          {apiError && (
+            <p className="text-red-500 text-sm text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">{apiError}</p>
           )}
 
           {/* Submit */}
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm cursor-pointer"
+            disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm cursor-pointer"
           >
-            Raise Call
+            {submitting ? 'Submitting...' : 'Raise Service Call'}
           </button>
 
         </form>

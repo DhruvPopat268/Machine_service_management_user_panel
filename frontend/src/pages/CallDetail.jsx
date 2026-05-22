@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
-import { calls } from '../data/calls'
+import { fetchCallDetail } from '../api/machines'
 
 const fmt = (date) =>
   new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -36,28 +36,27 @@ const PRIORITY_STYLES = {
   'Low':      'bg-gray-100 text-gray-500',
 }
 
-const AUDIT_DOT = {
-  'Open':        'bg-blue-500',
-  'Assigned':    'bg-purple-500',
-  'In Progress': 'bg-yellow-500',
-  'On Hold':     'bg-orange-500',
-  'Completed':   'bg-green-500',
-  'Cancelled':   'bg-red-500',
-}
-
 export default function CallDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const call = calls.find((c) => c.id === id)
+  const [call, setCall] = useState(null)
   const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 600); return () => clearTimeout(t) }, [])
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchCallDetail(id)
+      .then(setCall)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [id])
+
   if (loading) return <Spinner />
 
-  if (!call) {
+  if (error || !call) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 mb-4">Call not found.</p>
+          <p className="text-gray-500 mb-4">{error || 'Call not found.'}</p>
           <button onClick={() => navigate('/calls')} className="text-blue-600 hover:underline text-sm cursor-pointer">
             ← Back to Calls
           </button>
@@ -66,6 +65,8 @@ export default function CallDetail() {
     )
   }
 
+  const { callId, status, priority, machines, engineerInfo, dates } = call
+
   return (
     <Layout title="Call Detail" onBack={() => navigate('/calls')}>
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -73,117 +74,86 @@ export default function CallDetail() {
         {/* Heading */}
         <div>
           <div className="flex items-start justify-between gap-3 mb-1">
-            <h2 className="text-xl font-bold text-gray-800 leading-snug">{call.issueTitle}</h2>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 mt-1 ${STATUS_STYLES[call.status]}`}>
-              {call.status}
+            <div>
+              <p className="text-xs text-gray-400 mb-1">{callId}</p>
+              <h2 className="text-xl font-bold text-gray-800 leading-snug">
+                {machines?.[0]?.machineName ?? 'Service Call'}
+                {machines?.length > 1 && (
+                  <span className="text-base font-normal text-gray-400"> +{machines.length - 1} more</span>
+                )}
+              </h2>
+            </div>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 mt-1 ${STATUS_STYLES[status]}`}>
+              {status}
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <span className="text-xs text-gray-400">{call.ticketNumber}</span>
-            <span className="text-gray-300 text-xs">·</span>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${PRIORITY_STYLES[call.priority]}`}>
-              {call.priority} Priority
+          {priority && (
+            <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full mt-2 ${PRIORITY_STYLES[priority]}`}>
+              {priority} Priority
             </span>
-          </div>
+          )}
         </div>
-
-        {/* Issue Description */}
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Issue Description</h3>
-          <p className="text-sm text-gray-700 leading-relaxed">{call.issueDescription}</p>
-        </section>
 
         {/* Call Info */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Call Information</h3>
-          <Row label="Ticket Number" value={call.ticketNumber} />
-          <Row label="Status" value={call.status} />
-          <Row label="Priority" value={call.priority} />
-          <Row label="Contract Type" value={call.contractType} />
-          <Row label="Contract Code" value={call.contractCode} />
-          <Row label="Raised On" value={fmtDateTime(call.raisedAt)} />
-          <Row label="Assigned On" value={call.assignedAt ? fmtDateTime(call.assignedAt) : null} />
-          <Row label="Expected Resolution" value={call.expectedResolutionDate ? fmt(call.expectedResolutionDate) : null} />
-          {call.resolvedAt && <Row label="Resolved On" value={fmtDateTime(call.resolvedAt)} />}
-          {call.cancelledAt && <Row label="Cancelled On" value={fmtDateTime(call.cancelledAt)} />}
-          {call.cancellationReason && <Row label="Cancellation Reason" value={call.cancellationReason} />}
+          <Row label="Call ID" value={callId} />
+          <Row label="Status" value={status} />
+          <Row label="Priority" value={priority ?? 'Not set yet'} />
+          <Row label="Raised On" value={dates?.created ? fmtDateTime(dates.created) : null} />
+          <Row label="Assigned On" value={dates?.assigned ? fmtDateTime(dates.assigned) : null} />
+          <Row label="In Progress On" value={dates?.inProgress ? fmtDateTime(dates.inProgress) : null} />
+          {dates?.completed && <Row label="Completed On" value={fmtDateTime(dates.completed)} />}
+          {dates?.cancelled && <Row label="Cancelled On" value={fmtDateTime(dates.cancelled)} />}
         </section>
 
-        {/* Machine Info */}
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Machine Information</h3>
-          <Row label="Machine Name" value={call.machineName} />
-          <Row label="Model Number" value={call.modelNumber} />
-          <Row label="Serial Number" value={call.serialNumber} />
-          <Row label="Category" value={call.category} />
-          <Row label="Division" value={call.division} />
-        </section>
+        {/* Machines */}
+        {machines?.map((m, i) => (
+          <section key={m.variantId ?? i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">
+              Machine {machines.length > 1 ? `#${i + 1}` : 'Information'}
+            </h3>
+            <Row label="Machine Name" value={m.machineName} />
+            <Row label="Model Number" value={m.modelNumber} />
+            <Row label="Category" value={m.category} />
+            <Row label="Division" value={m.division} />
+            <Row label={m.attributeName ?? 'Variant'} value={m.attributeValue} />
+            <Row label="Contract" value={m.contractType?.name} />
+            <Row label="Contract Code" value={m.contractType?.code} />
+            <Row label="Problem Type" value={m.problemType ?? null} />
+
+            {/* Issue Description */}
+            {m.issueDescription && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 mb-1">Issue Description</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{m.issueDescription}</p>
+              </div>
+            )}
+
+            {/* Images */}
+            {m.images?.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 mb-2">Images</p>
+                <div className="flex flex-wrap gap-2">
+                  {m.images.map((img, idx) => (
+                    <a key={idx} href={img} target="_blank" rel="noreferrer">
+                      <img src={img} alt={`img ${idx + 1}`} className="w-20 h-20 rounded-xl object-cover border border-gray-100 hover:opacity-80 transition-opacity" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        ))}
 
         {/* Engineer Info */}
-        {call.engineer ? (
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Assigned Engineer</h3>
-            <Row label="Name" value={call.engineer.name} />
-            <Row label="Phone" value={`+91 ${call.engineer.phone}`} />
-            <Row label="Email" value={call.engineer.email} />
-          </section>
-        ) : (
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Assigned Engineer</h3>
-            <p className="text-sm text-gray-400">No engineer assigned yet.</p>
-          </section>
-        )}
-
-        {/* Resolution Notes */}
-        {call.resolutionNotes && (
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Resolution Notes</h3>
-            <p className="text-sm text-gray-700 leading-relaxed">{call.resolutionNotes}</p>
-          </section>
-        )}
-
-        {/* Parts Used */}
-        {call.partsUsed.length > 0 && (
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Parts Used</h3>
-            <div className="space-y-0">
-              {call.partsUsed.map((part, i) => (
-                <div key={i} className="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{part.partName}</p>
-                    <p className="text-xs text-gray-400">{part.partCode}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-700">Qty: {part.quantity}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Audit Trail */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wide">Audit Trail</h3>
-          <div className="relative">
-            {/* vertical line */}
-            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
-            <div className="space-y-5">
-              {call.auditTrail.map((entry, i) => (
-                <div key={i} className="flex gap-4 relative">
-                  <div className={`w-3.5 h-3.5 rounded-full shrink-0 mt-0.5 z-10 ${AUDIT_DOT[entry.status]}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-0.5">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full self-start ${STATUS_STYLES[entry.status]}`}>
-                        {entry.status}
-                      </span>
-                      <span className="text-xs text-gray-400">{fmtDateTime(entry.timestamp)}</span>
-                    </div>
-                    <p className="text-sm text-gray-700">{entry.note}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">by {entry.by}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Assigned Engineer</h3>
+          {engineerInfo?.name ? (
+            <Row label="Name" value={engineerInfo.name} />
+          ) : (
+            <p className="text-sm text-gray-400">No engineer assigned yet.</p>
+          )}
         </section>
 
       </main>
