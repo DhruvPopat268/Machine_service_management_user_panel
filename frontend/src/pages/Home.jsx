@@ -93,6 +93,9 @@ export default function Home() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-800 leading-tight">{machine.machineName}</p>
+                        {machine.variant?.name && (
+                          <p className="text-xs text-blue-600 font-medium mt-0.5">{machine.variant.name}: {machine.variant.value}</p>
+                        )}
                         <p className="text-xs text-gray-400 mt-0.5">{machine.modelNumber} · {machine.category}</p>
                       </div>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500 shrink-0">
@@ -145,6 +148,9 @@ export default function Home() {
                           <span className="text-xs font-normal text-gray-400"> +{call.machines.length - 1} more</span>
                         )}
                       </p>
+                      {call.machines?.[0]?.attributeName && (
+                        <p className="text-xs text-blue-600 font-medium mt-0.5">{call.machines[0].attributeName}: {call.machines[0].attributeValue}</p>
+                      )}
                     </div>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[call.status]}`}>
                       {call.status}

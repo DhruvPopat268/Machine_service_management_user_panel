@@ -142,8 +142,8 @@ export default function Calls() {
                               <p className="text-xs"><span className="text-gray-400">Category :</span> <span className="font-medium text-gray-700">{m.category}</span></p>
                               <p className="text-xs"><span className="text-gray-400">Division :</span> <span className="font-medium text-gray-700">{m.division}</span></p>
                             </div>
-                            {m.problemType && (
-                              <p className="text-xs"><span className="text-gray-400">Problem :</span> <span className="font-medium text-gray-700">{m.problemType}</span></p>
+                            {m.problemTypes?.length > 0 && (
+                              <p className="text-xs"><span className="text-gray-400">Problem :</span> <span className="font-medium text-gray-700">{m.problemTypes.join(', ')}</span></p>
                             )}
                             {m.issueDescription && (
                               <p className="text-xs pt-1 border-t border-gray-200"><span className="text-gray-400">Description :</span> <span className="font-medium text-gray-700">{m.issueDescription}</span></p>
