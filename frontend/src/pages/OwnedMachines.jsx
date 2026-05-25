@@ -48,7 +48,7 @@ export default function OwnedMachines() {
         {machines.length === 0 && !error ? (
           <div className="text-center py-20 text-gray-400 text-sm">No machines found.</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {machines.map((item) => {
               const { variant } = item
               const contract = variant?.contractType
