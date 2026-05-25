@@ -41,7 +41,7 @@ export const raiseServiceCall = (selected) => {
   const serviceCalls = Object.entries(selected).map(([variantId, detail]) => ({
     variantId,
     issueDescription: detail.issueDescription,
-    ...(detail.problemTypeId ? { problemTypeId: detail.problemTypeId } : {}),
+    ...(detail.problemTypeIds?.length ? { problemTypeIds: detail.problemTypeIds } : {}),
   }))
   formData.append('serviceCalls', JSON.stringify(serviceCalls))
   Object.entries(selected).forEach(([, detail], idx) => {

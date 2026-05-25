@@ -57,8 +57,8 @@ export default function CallDetail() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500 mb-4">{error || 'Call not found.'}</p>
-          <button onClick={() => navigate('/calls')} className="text-blue-600 hover:underline text-sm cursor-pointer">
-            ← Back to Calls
+          <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline text-sm cursor-pointer">
+            ← Back
           </button>
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function CallDetail() {
   const { callId, status, priority, machines, engineerInfo, dates } = call
 
   return (
-    <Layout title="Call Detail" onBack={() => navigate('/calls')}>
+    <Layout title="Call Detail" onBack={() => navigate(-1)}>
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
         {/* Heading */}
@@ -120,7 +120,7 @@ export default function CallDetail() {
             <Row label={m.attributeName ?? 'Variant'} value={m.attributeValue} />
             <Row label="Contract" value={m.contractType?.name} />
             <Row label="Contract Code" value={m.contractType?.code} />
-            <Row label="Problem Type" value={m.problemType ?? null} />
+            <Row label="Problem Type" value={m.problemTypes?.length > 0 ? m.problemTypes.join(', ') : null} />
 
             {/* Issue Description */}
             {m.issueDescription && (

@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
 import { fetchAllOwnedMachines, fetchProblemTypes, raiseServiceCall } from '../api/machines'
 
-const emptyDetail = () => ({ issueDescription: '', problemTypeId: '', photos: [] })
+const emptyDetail = () => ({ issueDescription: '', problemTypeIds: [], photos: [] })
 
 export default function RaiseCall() {
   const navigate = useNavigate()
@@ -37,6 +37,7 @@ export default function RaiseCall() {
 
   // variantId → detail object
   const [selected, setSelected] = useState({})
+  const [openDropdown, setOpenDropdown] = useState(null)
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -249,21 +250,74 @@ export default function RaiseCall() {
                       </div>
                     </div>
 
-                    {/* Problem Type (optional) */}
-                    <div>
+                    {/* Problem Types (optional, multi-select dropdown) */}
+                    <div className="relative">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Problem Type <span className="text-gray-400 font-normal">(Optional)</span>
                       </label>
-                      <select
-                        value={detail.problemTypeId}
-                        onChange={(e) => updateDetail(variantId, 'problemTypeId', e.target.value)}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      {/* Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setOpenDropdown(openDropdown === variantId ? null : variantId)}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-left flex items-center justify-between gap-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
-                        <option value="">Select problem type</option>
-                        {problemTypes.map((p) => (
-                          <option key={p._id} value={p._id}>{p.name}</option>
-                        ))}
-                      </select>
+                        <span className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                          {detail.problemTypeIds.length === 0 ? (
+                            <span className="text-gray-400">Select problem type(s)</span>
+                          ) : (
+                            detail.problemTypeIds.map((id) => {
+                              const pt = problemTypes.find((p) => p._id === id)
+                              return pt ? (
+                                <span key={id} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                                  {pt.name}
+                                  <span
+                                    role="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      updateDetail(variantId, 'problemTypeIds', detail.problemTypeIds.filter((x) => x !== id))
+                                    }}
+                                    className="cursor-pointer hover:text-blue-900 leading-none"
+                                  >✕</span>
+                                </span>
+                              ) : null
+                            })
+                          )}
+                        </span>
+                        <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${openDropdown === variantId ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {/* Dropdown list */}
+                      {openDropdown === variantId && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {problemTypes.map((p) => {
+                            const checked = detail.problemTypeIds.includes(p._id)
+                            return (
+                              <div
+                                key={p._id}
+                                onClick={() => {
+                                  const ids = checked
+                                    ? detail.problemTypeIds.filter((id) => id !== p._id)
+                                    : [...detail.problemTypeIds, p._id]
+                                  updateDetail(variantId, 'problemTypeIds', ids)
+                                }}
+                                className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                              >
+                                <div className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-all ${
+                                  checked ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                                }`}>
+                                  {checked && (
+                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <span className="text-sm text-gray-700">{p.name}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {/* Issue Description (required) */}
@@ -344,14 +398,16 @@ export default function RaiseCall() {
                 {selectedIds.map((variantId, idx) => {
                   const v = variants.find((x) => x.variantId === variantId)
                   const detail = selected[variantId]
-                  const pt = problemTypes.find((p) => p._id === detail.problemTypeId)
+                  const ptNames = detail.problemTypeIds
+                    .map((id) => problemTypes.find((p) => p._id === id)?.name)
+                    .filter(Boolean)
                   return (
                     <div key={variantId} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="font-semibold text-blue-500 shrink-0">{idx + 1}.</span>
                       <span>
                         <span className="font-semibold text-gray-800">{v.machineName}</span>
                         {' '}({v.attributeValue})
-                        {pt && <span className="text-gray-500"> — {pt.name}</span>}
+                        {ptNames.length > 0 && <span className="text-gray-500"> — {ptNames.join(', ')}</span>}
                         {detail.photos.length > 0 && (
                           <span className="text-gray-400"> · {detail.photos.length} photo{detail.photos.length > 1 ? 's' : ''}</span>
                         )}

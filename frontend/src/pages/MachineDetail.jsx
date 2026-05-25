@@ -39,8 +39,8 @@ export default function MachineDetail() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500 mb-4">{error || 'Machine not found.'}</p>
-          <button onClick={() => navigate('/machines')} className="text-blue-600 hover:underline text-sm cursor-pointer">
-            ← Back to My Machines
+          <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline text-sm cursor-pointer">
+            ← Back
           </button>
         </div>
       </div>
@@ -53,7 +53,7 @@ export default function MachineDetail() {
   const total = images.length
 
   return (
-    <Layout title="Machine Detail" onBack={() => navigate('/machines')}>
+    <Layout title="Machine Detail" onBack={() => navigate(-1)}>
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
         {/* Machine Name Heading */}
