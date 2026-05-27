@@ -5,7 +5,6 @@ import ConfirmModal from './ConfirmModal'
 import { initialNotifications } from '../data/notifications'
 import { logout, changePassword } from '../api/auth'
 import { useProfile } from '../context/ProfileContext'
-import { getAvatarInitials } from '../utils/getAvatarInitials'
 
 const fmtAgo = (date) => {
   const diff = Math.floor((Date.now() - new Date(date)) / 1000)
@@ -307,9 +306,12 @@ export default function Layout({ title, subtitle, onBack, children }) {
           <div className="relative" ref={profileRef}>
             <button
               onClick={() => { setProfileOpen((p) => !p); setNotifOpen(false) }}
-              className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:bg-blue-700 transition-colors"
+              className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:bg-blue-700 transition-colors overflow-hidden"
             >
-              {getAvatarInitials(profile?.name)}
+              {profile?.profilePhoto
+                ? <img src={profile.profilePhoto} alt={profile.name} className="w-full h-full object-cover" />
+                : <span>{profile?.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+              }
             </button>
 
             {/* Profile Dropdown */}

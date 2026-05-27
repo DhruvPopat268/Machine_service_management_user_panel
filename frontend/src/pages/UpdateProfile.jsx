@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
 import { fetchZones, updateProfile, sendChangeEmailOtp, verifyOtpChangeEmail } from '../api/auth'
 import { useProfile } from '../context/ProfileContext'
-import { getAvatarInitials } from '../utils/getAvatarInitials'
+import AddressAutocomplete from '../components/AddressAutocomplete'
 
 function ChangeEmailModal({ currentEmail, onClose, onSuccess }) {
   const [step, setStep] = useState('email') // 'email' | 'otp'
@@ -163,11 +163,19 @@ export default function UpdateProfile() {
   const [zones, setZones] = useState([])
   const [zonesLoading, setZonesLoading] = useState(true)
   const [form, setForm] = useState(null)
+  const [userLocation, setUserLocation] = useState(null)
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const [errors, setErrors] = useState({})
   const [apiError, setApiError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const photoInputRef = useRef(null)
+
+  useEffect(() => {
+    return () => { if (photoPreview) URL.revokeObjectURL(photoPreview) }
+  }, [photoPreview])
 
   useEffect(() => {
     fetchZones()
@@ -181,10 +189,11 @@ export default function UpdateProfile() {
       setForm({
         name: profile.name ?? '',
         phone: profile.phone ?? '',
-        address: profile.address ?? '',
+        address: profile.userLocation?.address ?? '',
         zone: profile.zone?._id ?? '',
         gst: profile.gstNumber ?? '',
       })
+      setUserLocation(profile.userLocation ?? null)
     }
   }, [profile])
 
@@ -196,7 +205,8 @@ export default function UpdateProfile() {
     const e = {}
     if (!form.name.trim()) e.name = 'Name is required'
     if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = 'Enter valid 10-digit mobile number'
-    if (!form.address.trim()) e.address = 'Address is required'
+    if (!form.address.trim()) e.address = 'Please select an address from suggestions'
+    if (!userLocation) e.address = 'Please select an address from suggestions'
     if (!form.zone) e.zone = 'Please select a zone'
     if (form.gst && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(form.gst))
       e.gst = 'Enter valid GST number'
@@ -214,9 +224,10 @@ export default function UpdateProfile() {
       await updateProfile({
         name: form.name,
         phone: form.phone,
-        address: form.address,
+        userLocation,
         zone: form.zone,
         ...(form.gst && { gstNumber: form.gst }),
+        ...(photoFile && { profilePhoto: photoFile }),
       })
       await refreshProfile()
       setSaved(true)
@@ -237,12 +248,50 @@ export default function UpdateProfile() {
 
           {/* Avatar */}
           <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
-            <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
-              {getAvatarInitials(form.name)}
+            <div className="relative shrink-0">
+              <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+                {photoPreview
+                  ? <img src={photoPreview} alt="preview" className="w-full h-full object-cover" />
+                  : profile?.profilePhoto
+                    ? <img src={profile.profilePhoto} alt={form.name} className="w-full h-full object-cover" />
+                    : <span>{form.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+                }
+              </div>
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                className="absolute -bottom-0.5 -right-0.5 w-6 h-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow cursor-pointer transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+                </svg>
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setPhotoFile(file)
+                  setPhotoPreview(URL.createObjectURL(file))
+                  e.target.value = ''
+                }}
+              />
             </div>
             <div>
               <p className="text-base font-bold text-gray-800">{form.name}</p>
               <p className="text-xs text-gray-400">{selectedZoneName}</p>
+              {photoFile && (
+                <button
+                  type="button"
+                  onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
+                  className="text-xs text-red-400 hover:text-red-600 mt-0.5 cursor-pointer"
+                >
+                  Remove new photo
+                </button>
+              )}
             </div>
           </div>
 
@@ -309,12 +358,11 @@ export default function UpdateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Address <span className="text-red-500">*</span>
               </label>
-              <textarea
-                rows={2}
-                placeholder="Street, City, State, PIN"
+              <AddressAutocomplete
                 value={form.address}
-                onChange={set('address')}
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${errors.address ? 'border-red-400' : 'border-gray-300'}`}
+                onChange={(val) => { setForm((f) => ({ ...f, address: val })); setUserLocation(null); setErrors((e) => ({ ...e, address: '' })) }}
+                onSelect={(loc) => { setUserLocation(loc); setForm((f) => ({ ...f, address: loc.address })); setErrors((e) => ({ ...e, address: '' })) }}
+                error={errors.address}
               />
               {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
             </div>

@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import ConfirmModal from './ConfirmModal'
 import { logout } from '../api/auth'
 import { useProfile } from '../context/ProfileContext'
-import { getAvatarInitials } from '../utils/getAvatarInitials'
 
 const NAV_ITEMS = [
   { label: 'Home', path: '/' },
@@ -49,8 +48,11 @@ export default function Sidebar({ open, onClose }) {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
-              {getAvatarInitials(profile?.name)}
+            <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg overflow-hidden">
+              {profile?.profilePhoto
+                ? <img src={profile.profilePhoto} alt={profile.name} className="w-full h-full object-cover" />
+                : <span>{profile?.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+              }
             </div>
             <div>
               <p className="text-white font-semibold text-sm leading-tight">{profile?.name ?? '—'}</p>

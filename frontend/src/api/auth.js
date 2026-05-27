@@ -45,8 +45,19 @@ export const fetchProfile = () =>
 export const logout = () =>
   axiosInstance.post(`${BASE}/logout`).then(unwrap)
 
-export const updateProfile = (body) =>
-  axiosInstance.patch(`${BASE}/update-profile`, body).then(unwrap)
+export const updateProfile = (body) => {
+  if (body.profilePhoto instanceof File) {
+    const fd = new FormData()
+    Object.entries(body).forEach(([k, v]) => {
+      if (k === 'profilePhoto') fd.append('profilePhoto', v)
+      else fd.append(k, typeof v === 'object' ? JSON.stringify(v) : v)
+    })
+    return axiosInstance.patch(`${BASE}/update-profile`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(unwrap)
+  }
+  return axiosInstance.patch(`${BASE}/update-profile`, body).then(unwrap)
+}
 
 export const sendChangeEmailOtp = (newEmail) =>
   axiosInstance.post(`${BASE}/send-change-email-otp`, { newEmail }).then(unwrap)
