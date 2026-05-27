@@ -1,13 +1,58 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
 import { fetchAllOwnedMachines, fetchProblemTypes, raiseServiceCall } from '../api/machines'
+import { useProfile } from '../context/ProfileContext'
+import AddressAutocomplete from '../components/AddressAutocomplete'
+
+function ChangeLocationModal({ current, onClose, onConfirm }) {
+  const [draft, setDraft] = useState(current?.address ?? '')
+  const [draftLocation, setDraftLocation] = useState(current ?? null)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-bold text-gray-800">Change Service Location</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer text-lg leading-none">✕</button>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">Search and select the location where the engineer should visit.</p>
+        <AddressAutocomplete
+          value={draft}
+          onChange={(val) => { setDraft(val); setDraftLocation(null) }}
+          onSelect={(loc) => { setDraftLocation(loc); setDraft(loc.address) }}
+        />
+        {draftLocation && (
+          <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            Location selected
+          </p>
+        )}
+        <div className="flex gap-3 mt-5">
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer">
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!draftLocation}
+            onClick={() => { onConfirm(draftLocation); onClose() }}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors cursor-pointer"
+          >
+            Use This Location
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const emptyDetail = () => ({ issueDescription: '', problemTypeIds: [], photos: [] })
 
 export default function RaiseCall() {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [variants, setVariants] = useState([])
@@ -35,13 +80,29 @@ export default function RaiseCall() {
       .finally(() => setLoading(false))
   }, [])
 
-  // variantId → detail object
   const [selected, setSelected] = useState({})
   const [openDropdown, setOpenDropdown] = useState(null)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpenDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [customerLocation, setCustomerLocation] = useState(null)
+  const [locationModalOpen, setLocationModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (profile?.userLocation) setCustomerLocation(profile.userLocation)
+  }, [profile])
 
   if (loading) return <Spinner />
 
@@ -118,7 +179,7 @@ export default function RaiseCall() {
     setApiError('')
     setSubmitting(true)
     try {
-      await raiseServiceCall(selected)
+      await raiseServiceCall(selected, customerLocation)
       setSubmitted(true)
     } catch (err) {
       setApiError(err.message)
@@ -132,6 +193,7 @@ export default function RaiseCall() {
     setSelected({})
     setErrors({})
     setApiError('')
+    setCustomerLocation(profile?.userLocation ?? null)
   }
 
   if (submitted) {
@@ -251,7 +313,7 @@ export default function RaiseCall() {
                     </div>
 
                     {/* Problem Types (optional, multi-select dropdown) */}
-                    <div className="relative">
+                    <div className="relative" ref={openDropdown === variantId ? dropdownRef : null}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Problem Type <span className="text-gray-400 font-normal">(Optional)</span>
                       </label>
@@ -392,8 +454,10 @@ export default function RaiseCall() {
 
           {/* Summary */}
           {selectedIds.length > 0 && (
-            <section className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-wide mb-2">Summary</p>
+            <section className="bg-blue-50 rounded-2xl border border-blue-100 p-4 space-y-4">
+              <p className="text-xs font-bold text-blue-400 uppercase tracking-wide">Summary</p>
+
+              {/* Machines summary */}
               <div className="space-y-1">
                 {selectedIds.map((variantId, idx) => {
                   const v = variants.find((x) => x.variantId === variantId)
@@ -416,6 +480,33 @@ export default function RaiseCall() {
                   )
                 })}
               </div>
+
+              {/* Service Location */}
+              <div className="bg-white rounded-xl border border-blue-100 p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-700 mb-0.5">Service Location</p>
+                      {customerLocation?.address
+                        ? <p className="text-xs text-gray-500 leading-snug break-words">{customerLocation.address}</p>
+                        : <p className="text-xs text-red-400">No location set — please add one</p>
+                      }
+                      <p className="text-[11px] text-blue-400 mt-1">Engineer will visit this location</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLocationModalOpen(true)}
+                    className="shrink-0 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
             </section>
           )}
 
@@ -435,6 +526,14 @@ export default function RaiseCall() {
 
         </form>
       </main>
+
+      {locationModalOpen && (
+        <ChangeLocationModal
+          current={customerLocation}
+          onClose={() => setLocationModalOpen(false)}
+          onConfirm={(loc) => setCustomerLocation(loc)}
+        />
+      )}
     </Layout>
   )
 }

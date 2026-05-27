@@ -66,6 +66,7 @@ export default function AddressAutocomplete({ value, onChange, onSelect, error, 
   const handleSelect = (prediction) => {
     setOpen(false)
     setSuggestions([])
+    onChange(prediction.description)
 
     const placesService = new window.google.maps.places.PlacesService(
       document.createElement('div')
@@ -73,14 +74,14 @@ export default function AddressAutocomplete({ value, onChange, onSelect, error, 
     placesService.getDetails(
       {
         placeId: prediction.place_id,
-        fields: ['formatted_address', 'geometry'],
+        fields: ['geometry'],
         sessionToken: sessionTokenRef.current,
       },
       (place, status) => {
-        sessionTokenRef.current = null // reset token after detail fetch
+        sessionTokenRef.current = null
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry) {
           onSelect({
-            address: place.formatted_address,
+            address: prediction.description,
             latitude: place.geometry.location.lat(),
             longitude: place.geometry.location.lng(),
           })
