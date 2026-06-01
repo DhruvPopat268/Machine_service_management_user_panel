@@ -139,7 +139,9 @@ export default function MachineDetail() {
 
         {/* Variant & Pricing */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wide">Variant & Pricing</h3>
+          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wide">Variant 
+            {/* & Pricing */}
+            </h3>
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="flex justify-between items-center mb-3">
               <span className="text-sm font-semibold text-gray-800">{variant.name}</span>
@@ -147,15 +149,15 @@ export default function MachineDetail() {
             </div>
             <div className="space-y-0">
               <Row label="Quantity" value={`${variant.quantity} unit(s)`} />
-              <Row label="Unit Price" value={fmtCurrency(variant.price)} />
+              {/* <Row label="Unit Price" value={fmtCurrency(variant.price)} />
               {variant.discountedPrice && <Row label="Discounted Price" value={fmtCurrency(variant.discountedPrice)} />}
-              <Row label="Line Total" value={fmtCurrency(variant.total)} />
+              <Row label="Line Total" value={fmtCurrency(variant.total)} /> */}
             </div>
           </div>
-          <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+          {/* <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
             <span className="text-sm font-bold text-gray-700">Total</span>
             <span className="text-lg font-bold text-blue-600">{fmtCurrency(variant.total)}</span>
-          </div>
+          </div> */}
         </section>
 
         {/* Service Contract */}
