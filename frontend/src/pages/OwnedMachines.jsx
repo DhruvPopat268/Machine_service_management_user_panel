@@ -20,7 +20,7 @@ export default function OwnedMachines() {
   useEffect(() => {
     setLoading(true)
     setError('')
-    fetchOwnedMachines(page, 10)
+    fetchOwnedMachines(page, 12)
       .then((data) => {
         setMachines(data.machines)
         setPagination(data.pagination)
@@ -56,7 +56,7 @@ export default function OwnedMachines() {
               return (
                 <div
                   key={variant._id}
-                  onClick={() => navigate(`/machines/${variant._id}`)}
+                  onClick={() => navigate(`/machines/${variant._id}`, { state: { serialNumber: variant.serialNumber } })}
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
                 >
                   {/* Machine Image */}
@@ -86,6 +86,7 @@ export default function OwnedMachines() {
                       <p className="text-xs text-gray-400 mt-0.5">Model: {item.modelNumber}</p>
                       <p className="text-xs text-gray-400 mt-0.5">Category: {item.category}</p>
                       <p className="text-xs text-gray-400 mt-0.5">Division: {item.division}</p>
+                      {variant.serialNumber && <p className="text-xs text-gray-400 mt-0.5">S/N: {variant.serialNumber}</p>}
                     </div>
 
                     {/* Variant Info */}

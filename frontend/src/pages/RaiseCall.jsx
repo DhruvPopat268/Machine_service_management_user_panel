@@ -62,16 +62,18 @@ export default function RaiseCall() {
     Promise.all([fetchAllOwnedMachines(), fetchProblemTypes()])
       .then(([machinesData, ptData]) => {
         // Flatten machines → variants, keep only needed fields
-        const flat = (machinesData.machines ?? machinesData).flatMap((item) => {
+        const flat = (machinesData.machines ?? machinesData).map((item) => {
           const { variant } = item
-          return [{
+          return {
+            key: `${variant._id}__${variant.serialNumber}`,
             variantId: variant._id,
+            serialNumber: variant.serialNumber,
             machineName: item.machineName,
             category: item.category,
             division: item.division,
             attributeName: variant.name,
             attributeValue: variant.value,
-          }]
+          }
         })
         setVariants(flat)
         setProblemTypes(ptData.problemTypes ?? ptData)
@@ -119,42 +121,42 @@ export default function RaiseCall() {
 
   const selectedIds = Object.keys(selected)
 
-  const toggleVariant = (variantId) => {
+  const toggleVariant = (v) => {
     setSelected((prev) => {
-      if (prev[variantId]) {
-        prev[variantId].photos.forEach((p) => URL.revokeObjectURL(p.preview))
+      if (prev[v.key]) {
+        prev[v.key].photos.forEach((p) => URL.revokeObjectURL(p.preview))
         const next = { ...prev }
-        delete next[variantId]
+        delete next[v.key]
         return next
       }
-      return { ...prev, [variantId]: emptyDetail() }
+      return { ...prev, [v.key]: { ...emptyDetail(), variantId: v.variantId, serialNumber: v.serialNumber } }
     })
-    setErrors((prev) => { const e = { ...prev }; delete e[variantId]; return e })
+    setErrors((prev) => { const e = { ...prev }; delete e[v.key]; return e })
   }
 
-  const updateDetail = (variantId, field, value) => {
-    setSelected((prev) => ({ ...prev, [variantId]: { ...prev[variantId], [field]: value } }))
+  const updateDetail = (key, field, value) => {
+    setSelected((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }))
     if (field === 'issueDescription') {
-      setErrors((prev) => { const e = { ...prev }; delete e[variantId]; return e })
+      setErrors((prev) => { const e = { ...prev }; delete e[key]; return e })
     }
   }
 
-  const handlePhotoChange = (variantId, e) => {
+  const handlePhotoChange = (key, e) => {
     const files = Array.from(e.target.files)
-    const current = selected[variantId].photos
+    const current = selected[key].photos
     const remaining = 5 - current.length
     const toAdd = files.slice(0, remaining).map((file) => ({
       file,
       preview: URL.createObjectURL(file),
     }))
-    updateDetail(variantId, 'photos', [...current, ...toAdd])
+    updateDetail(key, 'photos', [...current, ...toAdd])
     e.target.value = ''
   }
 
-  const removePhoto = (variantId, i) => {
-    const photos = selected[variantId].photos
+  const removePhoto = (key, i) => {
+    const photos = selected[key].photos
     URL.revokeObjectURL(photos[i].preview)
-    updateDetail(variantId, 'photos', photos.filter((_, idx) => idx !== i))
+    updateDetail(key, 'photos', photos.filter((_, idx) => idx !== i))
   }
 
   const validate = () => {
@@ -163,10 +165,10 @@ export default function RaiseCall() {
       e.__global = 'Please select at least one machine variant'
       return e
     }
-    selectedIds.forEach((id) => {
-      const desc = selected[id].issueDescription.trim()
-      if (!desc) e[id] = 'Issue description is required'
-      else if (desc.length < 10) e[id] = 'Description must be at least 10 characters'
+    selectedIds.forEach((key) => {
+      const desc = selected[key].issueDescription.trim()
+      if (!desc) e[key] = 'Issue description is required'
+      else if (desc.length < 10) e[key] = 'Description must be at least 10 characters'
     })
     return e
   }
@@ -247,11 +249,11 @@ export default function RaiseCall() {
 
             <div className="space-y-2">
               {variants.map((v) => {
-                const isSelected = !!selected[v.variantId]
+                const isSelected = !!selected[v.key]
                 return (
                   <div
-                    key={v.variantId}
-                    onClick={() => toggleVariant(v.variantId)}
+                    key={v.key}
+                    onClick={() => toggleVariant(v)}
                     className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
                       isSelected
                         ? 'border-blue-500 bg-blue-50'
@@ -276,6 +278,7 @@ export default function RaiseCall() {
                         {v.attributeName}: <span className="font-medium text-gray-700">{v.attributeValue}</span>
                       </p>
                       <p className="text-xs text-gray-400">{v.category} · {v.division}</p>
+                      {v.serialNumber && <p className="text-xs text-gray-400">S/N: {v.serialNumber}</p>}
                     </div>
                   </div>
                 )
@@ -294,13 +297,13 @@ export default function RaiseCall() {
                 Issue Details — {selectedIds.length} variant{selectedIds.length > 1 ? 's' : ''}
               </h3>
 
-              {selectedIds.map((variantId, idx) => {
-                const v = variants.find((x) => x.variantId === variantId)
-                const detail = selected[variantId]
-                const hasError = !!errors[variantId]
+              {selectedIds.map((key, idx) => {
+                const v = variants.find((x) => x.key === key)
+                const detail = selected[key]
+                const hasError = !!errors[key]
 
                 return (
-                  <div key={variantId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                  <div key={key} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                     {/* Variant header */}
                     <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
                       <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
@@ -309,18 +312,19 @@ export default function RaiseCall() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-800 leading-tight">{v.machineName}</p>
                         <p className="text-xs text-gray-400">{v.attributeName}: {v.attributeValue}</p>
+                        {v.serialNumber && <p className="text-xs text-gray-400">S/N: {v.serialNumber}</p>}
                       </div>
                     </div>
 
                     {/* Problem Types (optional, multi-select dropdown) */}
-                    <div className="relative" ref={openDropdown === variantId ? dropdownRef : null}>
+                    <div className="relative" ref={openDropdown === key ? dropdownRef : null}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Problem Type <span className="text-gray-400 font-normal">(Optional)</span>
                       </label>
                       {/* Trigger */}
                       <button
                         type="button"
-                        onClick={() => setOpenDropdown(openDropdown === variantId ? null : variantId)}
+                        onClick={() => setOpenDropdown(openDropdown === key ? null : key)}
                         className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-left flex items-center justify-between gap-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <span className="flex flex-wrap gap-1.5 flex-1 min-w-0">
@@ -336,7 +340,7 @@ export default function RaiseCall() {
                                     role="button"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      updateDetail(variantId, 'problemTypeIds', detail.problemTypeIds.filter((x) => x !== id))
+                                      updateDetail(key, 'problemTypeIds', detail.problemTypeIds.filter((x) => x !== id))
                                     }}
                                     className="cursor-pointer hover:text-blue-900 leading-none"
                                   >✕</span>
@@ -345,12 +349,12 @@ export default function RaiseCall() {
                             })
                           )}
                         </span>
-                        <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${openDropdown === variantId ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${openDropdown === key ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
                       {/* Dropdown list */}
-                      {openDropdown === variantId && (
+                      {openDropdown === key && (
                         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                           {problemTypes.map((p) => {
                             const checked = detail.problemTypeIds.includes(p._id)
@@ -361,7 +365,7 @@ export default function RaiseCall() {
                                   const ids = checked
                                     ? detail.problemTypeIds.filter((id) => id !== p._id)
                                     : [...detail.problemTypeIds, p._id]
-                                  updateDetail(variantId, 'problemTypeIds', ids)
+                                  updateDetail(key, 'problemTypeIds', ids)
                                 }}
                                 className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
                               >
@@ -391,14 +395,14 @@ export default function RaiseCall() {
                         rows={3}
                         placeholder="Describe the issue — when it started, what you observed, any error codes..."
                         value={detail.issueDescription}
-                        onChange={(e) => updateDetail(variantId, 'issueDescription', e.target.value)}
+                        onChange={(e) => updateDetail(key, 'issueDescription', e.target.value)}
                         className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           hasError ? 'border-red-400' : 'border-gray-300'
                         }`}
                       />
                       <div className="flex justify-between items-center mt-1">
                         {hasError
-                          ? <p className="text-red-500 text-xs">{errors[variantId]}</p>
+                          ? <p className="text-red-500 text-xs">{errors[key]}</p>
                           : <span />
                         }
                         <span className="text-xs text-gray-400">{detail.issueDescription.length} chars</span>
@@ -416,7 +420,7 @@ export default function RaiseCall() {
                             <img src={p.preview} alt={`photo ${i + 1}`} className="w-full h-full object-cover" />
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); removePhoto(variantId, i) }}
+                              onClick={(e) => { e.stopPropagation(); removePhoto(key, i) }}
                               className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-[10px] cursor-pointer leading-none"
                             >
                               ✕
@@ -437,7 +441,7 @@ export default function RaiseCall() {
                               accept="image/jpg,image/jpeg,image/png,image/webp"
                               multiple
                               className="hidden"
-                              onChange={(e) => handlePhotoChange(variantId, e)}
+                              onChange={(e) => handlePhotoChange(key, e)}
                             />
                           </label>
                         )}
@@ -459,18 +463,19 @@ export default function RaiseCall() {
 
               {/* Machines summary */}
               <div className="space-y-1">
-                {selectedIds.map((variantId, idx) => {
-                  const v = variants.find((x) => x.variantId === variantId)
-                  const detail = selected[variantId]
+                {selectedIds.map((key, idx) => {
+                  const v = variants.find((x) => x.key === key)
+                  const detail = selected[key]
                   const ptNames = detail.problemTypeIds
                     .map((id) => problemTypes.find((p) => p._id === id)?.name)
                     .filter(Boolean)
                   return (
-                    <div key={variantId} className="flex items-start gap-2 text-xs text-gray-600">
+                    <div key={key} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="font-semibold text-blue-500 shrink-0">{idx + 1}.</span>
                       <span>
                         <span className="font-semibold text-gray-800">{v.machineName}</span>
                         {' '}({v.attributeValue})
+                        {v.serialNumber && <span className="text-gray-500"> · S/N: {v.serialNumber}</span>}
                         {ptNames.length > 0 && <span className="text-gray-500"> — {ptNames.join(', ')}</span>}
                         {detail.photos.length > 0 && (
                           <span className="text-gray-400"> · {detail.photos.length} photo{detail.photos.length > 1 ? 's' : ''}</span>

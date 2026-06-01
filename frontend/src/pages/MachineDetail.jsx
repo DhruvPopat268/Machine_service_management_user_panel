@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { fetchMachineDetail } from '../api/machines'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
@@ -20,13 +20,14 @@ const Row = ({ label, value }) => (
 export default function MachineDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { state } = useLocation()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeImg, setActiveImg] = useState(0)
 
   useEffect(() => {
-    fetchMachineDetail(id)
+    fetchMachineDetail(id, state?.serialNumber)
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -129,6 +130,7 @@ export default function MachineDetail() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Machine Information</h3>
           <Row label="Machine Name" value={machine.machineName} />
+          <Row label="Serial Number" value={variant.serialNumber ?? state?.serialNumber} />
           <Row label="Model Number" value={machine.modelNumber} />
           <Row label="Category" value={machine.category} />
           <Row label="Division" value={machine.division} />

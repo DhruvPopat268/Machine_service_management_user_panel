@@ -10,8 +10,8 @@ const unwrap = (res) => {
 export const fetchOwnedMachines = (page = 1, limit = 10) =>
   axiosInstance.get(`${BASE}/`, { params: { page, limit } }).then(unwrap).then((d) => ({ ...d.data, pagination: d.pagination }))
 
-export const fetchMachineDetail = (variantId) =>
-  axiosInstance.get(`${BASE}/${variantId}`).then(unwrap).then((d) => d.data)
+export const fetchMachineDetail = (variantId, serialNumber) =>
+  axiosInstance.get(`${BASE}/${variantId}`, { params: { serialNumber } }).then(unwrap).then((d) => d.data)
 
 export const fetchAllOwnedMachines = () =>
   axiosInstance.get(`${BASE}/all`).then(unwrap).then((d) => d.data)
@@ -38,14 +38,15 @@ export const fetchDashboard = () =>
 
 export const raiseServiceCall = (selected, customerLocation) => {
   const formData = new FormData()
-  const serviceCalls = Object.entries(selected).map(([variantId, detail]) => ({
-    variantId,
+  const serviceCalls = Object.values(selected).map((detail) => ({
+    variantId: detail.variantId,
+    ...(detail.serialNumber && { serialNumber: detail.serialNumber }),
     issueDescription: detail.issueDescription,
     ...(detail.problemTypeIds?.length ? { problemTypeIds: detail.problemTypeIds } : {}),
   }))
   formData.append('serviceCalls', JSON.stringify(serviceCalls))
   if (customerLocation) formData.append('customerLocation', JSON.stringify(customerLocation))
-  Object.entries(selected).forEach(([, detail], idx) => {
+  Object.values(selected).forEach((detail, idx) => {
     detail.photos.forEach((p) => formData.append(`images_${idx}`, p.file))
   })
   return axiosInstance.post(
