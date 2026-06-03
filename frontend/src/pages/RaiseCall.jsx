@@ -73,6 +73,7 @@ export default function RaiseCall() {
             division: item.division,
             attributeName: variant.name,
             attributeValue: variant.value,
+            isContractExpired: variant.contractType?.isContractExpired ?? false,
           }
         })
         setVariants(flat)
@@ -82,6 +83,7 @@ export default function RaiseCall() {
       .finally(() => setLoading(false))
   }, [])
 
+  const [callType, setCallType] = useState('')
   const [selected, setSelected] = useState({})
   const [openDropdown, setOpenDropdown] = useState(null)
   const dropdownRef = useRef(null)
@@ -161,6 +163,10 @@ export default function RaiseCall() {
 
   const validate = () => {
     const e = {}
+    if (!callType) {
+      e.__callType = 'Please select a call type'
+      return e
+    }
     if (selectedIds.length === 0) {
       e.__global = 'Please select at least one machine variant'
       return e
@@ -181,7 +187,7 @@ export default function RaiseCall() {
     setApiError('')
     setSubmitting(true)
     try {
-      await raiseServiceCall(selected, customerLocation)
+      await raiseServiceCall(selected, customerLocation, callType)
       setSubmitted(true)
     } catch (err) {
       setApiError(err.message)
@@ -192,6 +198,7 @@ export default function RaiseCall() {
 
   const handleRaiseAnother = () => {
     setSubmitted(false)
+    setCallType('')
     setSelected({})
     setErrors({})
     setApiError('')
@@ -234,6 +241,26 @@ export default function RaiseCall() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         <form onSubmit={handleSubmit} className="space-y-5">
 
+          {/* Call Type */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Call Type</h3>
+            <select
+              value={callType}
+              onChange={(e) => { setCallType(e.target.value); setErrors((prev) => { const er = { ...prev }; delete er.__callType; return er }) }}
+              className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${
+                errors.__callType ? 'border-red-400' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Select call type</option>
+              <option value="Service-Call">Service Call</option>
+              <option value="Installation">Installation</option>
+              <option value="Deinstallation">Deinstallation</option>
+              <option value="Counter-Reading">Counter Reading</option>
+              <option value="Others">Others</option>
+            </select>
+            {errors.__callType && <p className="text-red-500 text-xs mt-1.5">{errors.__callType}</p>}
+          </section>
+
           {/* Step 1 — Select Variants */}
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
@@ -273,7 +300,14 @@ export default function RaiseCall() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-800 leading-tight truncate">{v.machineName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-gray-800 leading-tight truncate">{v.machineName}</p>
+                        <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          v.isContractExpired ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                        }`}>
+                          {v.isContractExpired ? 'Expired' : 'Active'}
+                        </span>
+                      </div>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {v.attributeName}: <span className="font-medium text-gray-700">{v.attributeValue}</span>
                       </p>

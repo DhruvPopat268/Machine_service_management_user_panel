@@ -36,7 +36,7 @@ export const fetchCallDetail = (id) =>
 export const fetchDashboard = () =>
   axiosInstance.get(`${SC_BASE}/dashboard`).then(unwrap).then((d) => d.data)
 
-export const raiseServiceCall = (selected, customerLocation) => {
+export const raiseServiceCall = (selected, customerLocation, callType) => {
   const formData = new FormData()
   const serviceCalls = Object.values(selected).map((detail) => ({
     variantId: detail.variantId,
@@ -45,6 +45,7 @@ export const raiseServiceCall = (selected, customerLocation) => {
     ...(detail.problemTypeIds?.length ? { problemTypeIds: detail.problemTypeIds } : {}),
   }))
   formData.append('serviceCalls', JSON.stringify(serviceCalls))
+  if (callType) formData.append('callType', callType)
   if (customerLocation) formData.append('customerLocation', JSON.stringify(customerLocation))
   Object.values(selected).forEach((detail, idx) => {
     detail.photos.forEach((p) => formData.append(`images_${idx}`, p.file))
