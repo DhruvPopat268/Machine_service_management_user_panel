@@ -65,7 +65,7 @@ export default function CallDetail() {
     )
   }
 
-  const { callId, status, priority, callType, note, machines, engineerInfo, customerInfo, dates, totalServiceCharges, beforeWorkImages, afterWorkImages } = call
+  const { callId, status, priority, callType, createdBy, machines, engineerInfo, customerInfo, dates, totalServiceCharges, totalPartsCharges, totalCharges, onHoldReason } = call
 
   return (
     <Layout title="Call Detail" onBack={() => navigate(-1)}>
@@ -100,11 +100,17 @@ export default function CallDetail() {
           <Row label="Call ID" value={callId} />
           <Row label="Status" value={status} />
           <Row label="Priority" value={priority ?? 'Not set yet'} />
+          <Row label="Call Type" value={callType} />
+          <Row label="Created By" value={createdBy} />
           <Row label="Raised On" value={dates?.created ? fmtDateTime(dates.created) : null} />
-          <Row label="Assigned On" value={dates?.assigned ? fmtDateTime(dates.assigned) : null} />
-          <Row label="In Progress On" value={dates?.inProgress ? fmtDateTime(dates.inProgress) : null} />
+          {dates?.assigned && <Row label="Assigned On" value={fmtDateTime(dates.assigned)} />}
+          {dates?.travelStarted && <Row label="Travel Started" value={fmtDateTime(dates.travelStarted)} />}
+          {dates?.reachedLocation && <Row label="Reached Location" value={fmtDateTime(dates.reachedLocation)} />}
+          {dates?.inProgress && <Row label="In Progress On" value={fmtDateTime(dates.inProgress)} />}
+          {dates?.onHold && <Row label="On Hold On" value={fmtDateTime(dates.onHold)} />}
           {dates?.completed && <Row label="Completed On" value={fmtDateTime(dates.completed)} />}
           {dates?.cancelled && <Row label="Cancelled On" value={fmtDateTime(dates.cancelled)} />}
+          {onHoldReason && <Row label="On Hold Reason" value={onHoldReason} />}
         </section>
 
         {/* Machines */}
@@ -122,6 +128,8 @@ export default function CallDetail() {
             <Row label="Contract Code" value={m.contractType?.code} />
             <Row label="Free Service" value={m.contractType?.freeService ? 'Included' : 'Not Included'} />
             <Row label="Free Parts" value={m.contractType?.freeParts ? 'Included' : 'Not Included'} />
+            {m.contractType?.validFrom && <Row label="Contract Valid From" value={fmt(m.contractType.validFrom)} />}
+            {m.contractType?.validTo && <Row label="Contract Valid To" value={fmt(m.contractType.validTo)} />}
             <Row label="Problem Type" value={m.problemTypes?.length > 0 ? m.problemTypes.join(', ') : null} />
             {m.serviceCharge > 0 && <Row label="Service Charge" value={`₹${m.serviceCharge}`} />}
 
@@ -133,15 +141,25 @@ export default function CallDetail() {
               </div>
             )}
 
-            {/* Used Parts */}
+            {/* Parts Added */}
             {m.usedParts?.length > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 mb-2">Used Parts</p>
-                <div className="space-y-1">
+                <p className="text-xs font-semibold text-gray-400 mb-2">Parts Added</p>
+                <div className="space-y-2">
                   {m.usedParts.map((part, idx) => (
-                    <p key={idx} className="text-sm text-gray-700">{part.name} × {part.quantity}</p>
+                    <div key={idx} className="flex justify-between items-start border border-gray-100 rounded-xl p-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-gray-800">{part.machineName}</span>
+                        <span className="text-xs text-gray-400">Part Code: {part.partCode} · {part.category}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5 text-xs text-gray-500 shrink-0 ml-3">
+                        <span className="text-gray-400 line-through">₹{part.sellingPrice}</span>
+                        <span>₹{part.discountedSellingPrice}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
+                {m.partsCharge > 0 && <p className="text-xs font-semibold text-green-600 mt-2 text-right">Parts Charge: ₹{m.partsCharge}</p>}
               </div>
             )}
 
@@ -161,52 +179,26 @@ export default function CallDetail() {
           </section>
         ))}
 
-        {/* Call Info extra */}
-        {(callType || note) && (
+        {/* Charges Summary */}
+        {(totalServiceCharges != null || totalPartsCharges > 0 || totalCharges > 0) && (
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Additional Info</h3>
-            {callType && <Row label="Call Type" value={callType} />}
-            {note && <Row label="Note" value={note} />}
-            {totalServiceCharges > 0 && <Row label="Total Service Charges" value={`₹${totalServiceCharges}`} />}
+            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Charges Summary</h3>
+            <Row label="Total Service Charges" value={`₹${totalServiceCharges ?? 0}`} />
+            {totalPartsCharges > 0 && <Row label="Total Parts Charges" value={`₹${totalPartsCharges}`} />}
+            {totalCharges > 0 && <Row label="Total Charges" value={`₹${totalCharges}`} />}
           </section>
         )}
 
-        {/* Before / After Work Images */}
-        {(beforeWorkImages?.length > 0 || afterWorkImages?.length > 0) && (
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
-            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Work Images</h3>
-            {beforeWorkImages?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 mb-2">Before Work</p>
-                <div className="flex flex-wrap gap-2">
-                  {beforeWorkImages.map((img, idx) => (
-                    <a key={idx} href={img} target="_blank" rel="noreferrer">
-                      <img src={img} alt={`before ${idx + 1}`} className="w-20 h-20 rounded-xl object-cover border border-gray-100 hover:opacity-80 transition-opacity" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            {afterWorkImages?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 mb-2">After Work</p>
-                <div className="flex flex-wrap gap-2">
-                  {afterWorkImages.map((img, idx) => (
-                    <a key={idx} href={img} target="_blank" rel="noreferrer">
-                      <img src={img} alt={`after ${idx + 1}`} className="w-20 h-20 rounded-xl object-cover border border-gray-100 hover:opacity-80 transition-opacity" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Service Location */}
-        {customerInfo?.location?.address && (
+        {/* Customer Info */}
+        {customerInfo && (
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Service Location</h3>
-            <Row label="Address" value={customerInfo.location.address} />
+            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Customer Information</h3>
+            <Row label="Name" value={customerInfo.name} />
+            <Row label="Phone" value={customerInfo.phone} />
+            <Row label="Email" value={customerInfo.email} />
+            {customerInfo.zone && <Row label="Zone" value={customerInfo.zone} />}
+            {customerInfo.gstNumber && <Row label="GST Number" value={customerInfo.gstNumber} />}
+            <Row label="Address" value={customerInfo.location?.address ?? customerInfo.address} />
           </section>
         )}
 
@@ -214,11 +206,17 @@ export default function CallDetail() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Assigned Engineer</h3>
           {engineerInfo?.name ? (
-            <Row label="Name" value={engineerInfo.name} />
+            <>
+              {engineerInfo.identityId && <Row label="Engineer ID" value={engineerInfo.identityId} />}
+              <Row label="Name" value={engineerInfo.name} />
+              {engineerInfo.phone && <Row label="Phone" value={engineerInfo.phone} />}
+              {engineerInfo.email && <Row label="Email" value={engineerInfo.email} />}
+            </>
           ) : (
             <p className="text-sm text-gray-400">No engineer assigned yet.</p>
           )}
         </section>
+
 
       </main>
     </Layout>
