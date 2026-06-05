@@ -49,22 +49,21 @@ export default function OwnedMachines() {
           <div className="text-center py-20 text-gray-400 text-sm">No machines found.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {machines.map((item) => {
-              const { variant } = item
-              const contract = variant?.contractType
+            {machines.map((machine) => {
+              const contract = machine.contractType
 
               return (
                 <div
-                  key={variant._id}
-                  onClick={() => navigate(`/machines/${variant._id}`, { state: { serialNumber: variant.serialNumber } })}
+                  key={`${machine.machineId}-${machine.serialNumber}`}
+                  onClick={() => navigate(`/machines/${machine.serialNumber}`)}
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
                 >
                   {/* Machine Image */}
                   <div className="h-44 bg-gray-100 overflow-hidden">
-                    {item.images?.[0] ? (
+                    {machine.images?.[0] ? (
                       <img
-                        src={item.images[0]}
-                        alt={item.machineName}
+                        src={machine.images[0]}
+                        alt={machine.machineName}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
@@ -78,27 +77,15 @@ export default function OwnedMachines() {
                     {/* Name & Meta */}
                     <div className="mb-3">
                       <div className="flex items-start justify-between gap-2">
-                        <h2 className="text-sm sm:text-base font-bold text-gray-800 leading-tight">{item.machineName}</h2>
+                        <h2 className="text-sm sm:text-base font-bold text-gray-800 leading-tight">{machine.machineName}</h2>
                         {contract?.isContractExpired && (
                           <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Expired</span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">Model: {item.modelNumber}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Category: {item.category}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Division: {item.division}</p>
-                      {variant.serialNumber && <p className="text-xs text-gray-400 mt-0.5">S/N: {variant.serialNumber}</p>}
-                    </div>
-
-                    {/* Variant Info */}
-                    <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1.5">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-500">{variant.name}</span>
-                        <span className="font-semibold text-gray-700">{variant.value}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs pt-1 border-t border-gray-200">
-                        <span className="text-gray-500">Quantity</span>
-                        <span className="font-semibold text-gray-700">{variant.quantity} unit(s)</span>
-                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">Model: {machine.modelNumber}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Category: {machine.category}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Division: {machine.division}</p>
+                      {machine.serialNumber && <p className="text-xs text-gray-400 mt-0.5">S/N: {machine.serialNumber}</p>}
                     </div>
 
                     {/* Contract Info */}
@@ -119,7 +106,7 @@ export default function OwnedMachines() {
 
                     {/* Footer */}
                     <div className="pt-3 border-t border-gray-100 flex justify-end">
-                      <p className="text-xs text-gray-400">Purchased At <span className="font-semibold text-gray-700">{fmt(item.createdAt)}</span></p>
+                      <p className="text-xs text-gray-400">Purchased At <span className="font-semibold text-gray-700">{fmt(machine.createdAt)}</span></p>
                     </div>
                   </div>
                 </div>

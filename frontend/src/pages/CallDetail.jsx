@@ -65,7 +65,7 @@ export default function CallDetail() {
     )
   }
 
-  const { callId, status, priority, machines, engineerInfo, dates } = call
+  const { callId, status, priority, callType, note, machines, engineerInfo, customerInfo, dates, totalServiceCharges, beforeWorkImages, afterWorkImages } = call
 
   return (
     <Layout title="Call Detail" onBack={() => navigate(-1)}>
@@ -109,24 +109,39 @@ export default function CallDetail() {
 
         {/* Machines */}
         {machines?.map((m, i) => (
-          <section key={m.variantId ?? i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <section key={m.serialNumber ?? i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">
               Machine {machines.length > 1 ? `#${i + 1}` : 'Information'}
             </h3>
             <Row label="Machine Name" value={m.machineName} />
+            <Row label="Serial Number" value={m.serialNumber} />
             <Row label="Model Number" value={m.modelNumber} />
             <Row label="Category" value={m.category} />
             <Row label="Division" value={m.division} />
-            <Row label={m.attributeName ?? 'Variant'} value={m.attributeValue} />
             <Row label="Contract" value={m.contractType?.name} />
             <Row label="Contract Code" value={m.contractType?.code} />
+            <Row label="Free Service" value={m.contractType?.freeService ? 'Included' : 'Not Included'} />
+            <Row label="Free Parts" value={m.contractType?.freeParts ? 'Included' : 'Not Included'} />
             <Row label="Problem Type" value={m.problemTypes?.length > 0 ? m.problemTypes.join(', ') : null} />
+            {m.serviceCharge > 0 && <Row label="Service Charge" value={`₹${m.serviceCharge}`} />}
 
             {/* Issue Description */}
             {m.issueDescription && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <p className="text-xs font-semibold text-gray-400 mb-1">Issue Description</p>
                 <p className="text-sm text-gray-700 leading-relaxed">{m.issueDescription}</p>
+              </div>
+            )}
+
+            {/* Used Parts */}
+            {m.usedParts?.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 mb-2">Used Parts</p>
+                <div className="space-y-1">
+                  {m.usedParts.map((part, idx) => (
+                    <p key={idx} className="text-sm text-gray-700">{part.name} × {part.quantity}</p>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -145,6 +160,55 @@ export default function CallDetail() {
             )}
           </section>
         ))}
+
+        {/* Call Info extra */}
+        {(callType || note) && (
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Additional Info</h3>
+            {callType && <Row label="Call Type" value={callType} />}
+            {note && <Row label="Note" value={note} />}
+            {totalServiceCharges > 0 && <Row label="Total Service Charges" value={`₹${totalServiceCharges}`} />}
+          </section>
+        )}
+
+        {/* Before / After Work Images */}
+        {(beforeWorkImages?.length > 0 || afterWorkImages?.length > 0) && (
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Work Images</h3>
+            {beforeWorkImages?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 mb-2">Before Work</p>
+                <div className="flex flex-wrap gap-2">
+                  {beforeWorkImages.map((img, idx) => (
+                    <a key={idx} href={img} target="_blank" rel="noreferrer">
+                      <img src={img} alt={`before ${idx + 1}`} className="w-20 h-20 rounded-xl object-cover border border-gray-100 hover:opacity-80 transition-opacity" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {afterWorkImages?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 mb-2">After Work</p>
+                <div className="flex flex-wrap gap-2">
+                  {afterWorkImages.map((img, idx) => (
+                    <a key={idx} href={img} target="_blank" rel="noreferrer">
+                      <img src={img} alt={`after ${idx + 1}`} className="w-20 h-20 rounded-xl object-cover border border-gray-100 hover:opacity-80 transition-opacity" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Service Location */}
+        {customerInfo?.location?.address && (
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Service Location</h3>
+            <Row label="Address" value={customerInfo.location.address} />
+          </section>
+        )}
 
         {/* Engineer Info */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">

@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { fetchMachineDetail } from '../api/machines'
 import Layout from '../components/Layout'
 import Spinner from '../components/Spinner'
 
 const fmt = (date) =>
   new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-
-const fmtCurrency = (n) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
 const Row = ({ label, value }) => (
   <div className="flex flex-row justify-between items-start py-2.5 border-b border-gray-100 last:border-0 gap-4">
@@ -20,14 +17,13 @@ const Row = ({ label, value }) => (
 export default function MachineDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { state } = useLocation()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeImg, setActiveImg] = useState(0)
 
   useEffect(() => {
-    fetchMachineDetail(id, state?.serialNumber)
+    fetchMachineDetail(id)
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -48,8 +44,8 @@ export default function MachineDetail() {
     )
   }
 
-  const { machine, variant, customerInfo, createdAt } = data
-  const contract = variant?.contractType
+  const { machine, customerInfo, createdAt } = data
+  const contract = machine?.contractType
   const images = machine?.images ?? []
   const total = images.length
 
@@ -130,34 +126,11 @@ export default function MachineDetail() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Machine Information</h3>
           <Row label="Machine Name" value={machine.machineName} />
-          <Row label="Serial Number" value={variant.serialNumber ?? state?.serialNumber} />
+          <Row label="Serial Number" value={machine.serialNumber} />
           <Row label="Model Number" value={machine.modelNumber} />
           <Row label="Category" value={machine.category} />
           <Row label="Division" value={machine.division} />
           <Row label="Purchased On" value={fmt(createdAt)} />
-        </section>
-
-        {/* Variant & Pricing */}
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wide">Variant 
-            {/* & Pricing */}
-            </h3>
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-sm font-semibold text-gray-800">{variant.name}</span>
-              <span className="text-sm font-semibold text-blue-600">{variant.value}</span>
-            </div>
-            <div className="space-y-0">
-              <Row label="Quantity" value={`${variant.quantity} unit(s)`} />
-              {/* <Row label="Unit Price" value={fmtCurrency(variant.price)} />
-              {variant.discountedPrice && <Row label="Discounted Price" value={fmtCurrency(variant.discountedPrice)} />}
-              <Row label="Line Total" value={fmtCurrency(variant.total)} /> */}
-            </div>
-          </div>
-          {/* <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
-            <span className="text-sm font-bold text-gray-700">Total</span>
-            <span className="text-lg font-bold text-blue-600">{fmtCurrency(variant.total)}</span>
-          </div> */}
         </section>
 
         {/* Service Contract */}

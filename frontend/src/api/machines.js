@@ -10,8 +10,8 @@ const unwrap = (res) => {
 export const fetchOwnedMachines = (page = 1, limit = 10) =>
   axiosInstance.get(`${BASE}/`, { params: { page, limit } }).then(unwrap).then((d) => ({ ...d.data, pagination: d.pagination }))
 
-export const fetchMachineDetail = (variantId, serialNumber) =>
-  axiosInstance.get(`${BASE}/${variantId}`, { params: { serialNumber } }).then(unwrap).then((d) => d.data)
+export const fetchMachineDetail = (serialNumber) =>
+  axiosInstance.get(`${BASE}/${serialNumber}`).then(unwrap).then((d) => d.data)
 
 export const fetchAllOwnedMachines = () =>
   axiosInstance.get(`${BASE}/all`).then(unwrap).then((d) => d.data)
@@ -39,8 +39,7 @@ export const fetchDashboard = () =>
 export const raiseServiceCall = (selected, customerLocation, callType) => {
   const formData = new FormData()
   const serviceCalls = Object.values(selected).map((detail) => ({
-    variantId: detail.variantId,
-    ...(detail.serialNumber && { serialNumber: detail.serialNumber }),
+    serialNumber: detail.serialNumber,
     issueDescription: detail.issueDescription,
     ...(detail.problemTypeIds?.length ? { problemTypeIds: detail.problemTypeIds } : {}),
   }))

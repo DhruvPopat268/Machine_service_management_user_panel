@@ -82,35 +82,29 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-3">
-              {expiredContractMachines.map((machine) => {
-                const contract = machine.variant?.contractType
-                return (
+              {expiredContractMachines.map((machine) => (
                   <div
-                    key={machine.variant?._id ?? machine.machineId}
-                    onClick={() => navigate(`/machines/${machine.variant?._id}`)}
+                    key={machine.serialNumber}
+                    onClick={() => navigate(`/machines/${machine.serialNumber}`)}
                     className="bg-white rounded-2xl border border-red-100 p-4 cursor-pointer hover:shadow-md hover:border-red-200 transition-all"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-800 leading-tight">{machine.machineName}</p>
-                        {machine.variant?.name && (
-                          <p className="text-xs text-blue-600 font-medium mt-0.5">{machine.variant.name}: {machine.variant.value}</p>
-                        )}
-                        <p className="text-xs text-gray-400 mt-0.5">{machine.modelNumber} · {machine.category}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{machine.modelNumber} · {machine.category} · S/N: {machine.serialNumber}</p>
                       </div>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500 shrink-0">
                         Expired
                       </span>
                     </div>
-                    {contract && (
+                    {machine.contractType && (
                       <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:justify-between gap-1 text-xs text-gray-500">
-                        <span>{contract.name} ({contract.code})</span>
-                        <span className="text-red-400 font-medium">Expired: {fmt(contract.validTo)}</span>
+                        <span>{machine.contractType.name} ({machine.contractType.code})</span>
+                        <span className="text-red-400 font-medium">Expired: {fmt(machine.contractType.validTo)}</span>
                       </div>
                     )}
                   </div>
-                )
-              })}
+              ))}
             </div>
           )}
         </section>
@@ -148,8 +142,8 @@ export default function Home() {
                           <span className="text-xs font-normal text-gray-400"> +{call.machines.length - 1} more</span>
                         )}
                       </p>
-                      {call.machines?.[0]?.attributeName && (
-                        <p className="text-xs text-blue-600 font-medium mt-0.5">{call.machines[0].attributeName}: {call.machines[0].attributeValue}</p>
+                      {call.machines?.[0]?.serialNumber && (
+                        <p className="text-xs text-gray-400 mt-0.5">S/N: {call.machines[0].serialNumber}</p>
                       )}
                     </div>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[call.status]}`}>

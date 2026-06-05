@@ -61,22 +61,17 @@ export default function RaiseCall() {
   useEffect(() => {
     Promise.all([fetchAllOwnedMachines(), fetchProblemTypes()])
       .then(([machinesData, ptData]) => {
-        // Flatten machines → variants, keep only needed fields
-        const flat = (machinesData.machines ?? machinesData).map((item) => {
-          const { variant } = item
-          return {
-            key: `${variant._id}__${variant.serialNumber}`,
-            variantId: variant._id,
-            serialNumber: variant.serialNumber,
-            machineName: item.machineName,
-            category: item.category,
-            division: item.division,
-            attributeName: variant.name,
-            attributeValue: variant.value,
-            isContractExpired: variant.contractType?.isContractExpired ?? false,
-          }
-        })
-        setVariants(flat)
+        const machines = (machinesData.machines ?? machinesData).map((machine) => ({
+          key: `${machine.machineId}__${machine.serialNumber}`,
+          machineId: machine.machineId,
+          serialNumber: machine.serialNumber,
+          machineName: machine.machineName,
+          category: machine.category,
+          division: machine.division,
+          modelNumber: machine.modelNumber,
+          isContractExpired: machine.contractType?.isContractExpired ?? false,
+        }))
+        setVariants(machines)
         setProblemTypes(ptData.problemTypes ?? ptData)
       })
       .catch((err) => setError(err.message))
@@ -131,7 +126,7 @@ export default function RaiseCall() {
         delete next[v.key]
         return next
       }
-      return { ...prev, [v.key]: { ...emptyDetail(), variantId: v.variantId, serialNumber: v.serialNumber } }
+      return { ...prev, [v.key]: { ...emptyDetail(), machineId: v.machineId, serialNumber: v.serialNumber } }
     })
     setErrors((prev) => { const e = { ...prev }; delete e[v.key]; return e })
   }
@@ -308,9 +303,7 @@ export default function RaiseCall() {
                           {v.isContractExpired ? 'Expired' : 'Active'}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {v.attributeName}: <span className="font-medium text-gray-700">{v.attributeValue}</span>
-                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Model: {v.modelNumber}</p>
                       <p className="text-xs text-gray-400">{v.category} · {v.division}</p>
                       {v.serialNumber && <p className="text-xs text-gray-400">S/N: {v.serialNumber}</p>}
                     </div>
@@ -345,7 +338,7 @@ export default function RaiseCall() {
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-800 leading-tight">{v.machineName}</p>
-                        <p className="text-xs text-gray-400">{v.attributeName}: {v.attributeValue}</p>
+                        <p className="text-xs text-gray-400">Model: {v.modelNumber}</p>
                         {v.serialNumber && <p className="text-xs text-gray-400">S/N: {v.serialNumber}</p>}
                       </div>
                     </div>
@@ -508,7 +501,7 @@ export default function RaiseCall() {
                       <span className="font-semibold text-blue-500 shrink-0">{idx + 1}.</span>
                       <span>
                         <span className="font-semibold text-gray-800">{v.machineName}</span>
-                        {' '}({v.attributeValue})
+                        {' '}({v.modelNumber})
                         {v.serialNumber && <span className="text-gray-500"> · S/N: {v.serialNumber}</span>}
                         {ptNames.length > 0 && <span className="text-gray-500"> — {ptNames.join(', ')}</span>}
                         {detail.photos.length > 0 && (

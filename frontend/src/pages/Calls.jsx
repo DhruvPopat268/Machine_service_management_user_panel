@@ -134,10 +134,10 @@ export default function Calls() {
                           Machines ({call.machines?.length ?? 0})
                         </p>
                         {call.machines?.map((m, i) => (
-                          <div key={m.variantId ?? i} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+                          <div key={m.serialNumber ?? i} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                             <p className="text-sm font-bold text-gray-800">{m.machineName}</p>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                              <p className="text-xs"><span className="text-gray-400">Variant :</span> <span className="font-medium text-gray-700">{m.attributeName}: {m.attributeValue}</span></p>
+                              <p className="text-xs"><span className="text-gray-400">S/N :</span> <span className="font-medium text-gray-700">{m.serialNumber}</span></p>
                               <p className="text-xs"><span className="text-gray-400">Model No :</span> <span className="font-medium text-gray-700">{m.modelNumber}</span></p>
                               <p className="text-xs"><span className="text-gray-400">Category :</span> <span className="font-medium text-gray-700">{m.category}</span></p>
                               <p className="text-xs"><span className="text-gray-400">Division :</span> <span className="font-medium text-gray-700">{m.division}</span></p>
