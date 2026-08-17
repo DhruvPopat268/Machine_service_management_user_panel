@@ -10,6 +10,12 @@ const INITIAL = {
   address: '',
   zone: '',
   gst: '',
+  department: '',
+  pincode: '',
+  type: '',
+  contactPersonName: '',
+  contactPersonPhone: '',
+  contactPersonDesignation: '',
   password: '',
   confirmPassword: '',
 }
@@ -65,6 +71,12 @@ export default function Signup() {
         userLocation,
         zone: form.zone,
         ...(form.gst && { gstNumber: form.gst }),
+        ...(form.department && { department: form.department }),
+        ...(form.pincode && { pincode: form.pincode }),
+        ...(form.type && { type: form.type }),
+        ...(form.contactPersonName && { contactPersonName: form.contactPersonName }),
+        ...(form.contactPersonPhone && { contactPersonPhone: form.contactPersonPhone }),
+        ...(form.contactPersonDesignation && { contactPersonDesignation: form.contactPersonDesignation }),
       })
       navigate('/')
     } catch (err) {
@@ -106,6 +118,9 @@ export default function Signup() {
           {/* Name */}
           {field('Full Name', 'name', { type: 'text', placeholder: 'John Doe' })}
 
+          {/* Department */}
+          {field('Department', 'department', { type: 'text', placeholder: 'e.g. Sales, IT, Operations', required: false })}
+
           {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -146,6 +161,9 @@ export default function Signup() {
             {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
           </div>
 
+          {/* Pincode */}
+          {field('Pincode', 'pincode', { type: 'text', placeholder: 'e.g. 400001', required: false })}
+
           {/* Zone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -184,6 +202,56 @@ export default function Signup() {
             />
             {errors.gst && <p className="text-red-500 text-xs mt-1">{errors.gst}</p>}
           </div>
+
+          {/* Customer Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer Type <span className="text-gray-400 font-normal">(Optional)</span>
+            </label>
+            <select
+              value={form.type}
+              onChange={set('type')}
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white ${
+                errors.type ? 'border-red-400' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Select type</option>
+              <option value="Jobber">Jobber</option>
+              <option value="Govt">Govt</option>
+              <option value="Pvt">Pvt</option>
+              <option value="Edun">Edun</option>
+            </select>
+            {errors.type && <p className="text-red-500 text-xs mt-1">{errors.type}</p>}
+          </div>
+
+          {/* Contact Person Name */}
+          {field('Contact Person Name', 'contactPersonName', { type: 'text', placeholder: 'e.g. John Doe', required: false })}
+
+          {/* Contact Person Phone */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contact Person Phone <span className="text-gray-400 font-normal">(Optional)</span>
+            </label>
+            <div className="flex">
+              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                +91
+              </span>
+              <input
+                type="tel"
+                maxLength={10}
+                placeholder="9876543210"
+                value={form.contactPersonPhone}
+                onChange={set('contactPersonPhone')}
+                className={`flex-1 border rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.contactPersonPhone ? 'border-red-400' : 'border-gray-300'
+                }`}
+              />
+            </div>
+            {errors.contactPersonPhone && <p className="text-red-500 text-xs mt-1">{errors.contactPersonPhone}</p>}
+          </div>
+
+          {/* Contact Person Designation */}
+          {field('Contact Person Designation', 'contactPersonDesignation', { type: 'text', placeholder: 'e.g. Manager, Director', required: false })}
 
           {/* Password */}
           <div>
